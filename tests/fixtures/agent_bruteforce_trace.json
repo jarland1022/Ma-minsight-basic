@@ -1,0 +1,29 @@
+{
+  "description": "Example brute_force investigation trace",
+  "steps": [
+    {
+      "step": 1,
+      "skill": "query_asset",
+      "input": {"entity_type": "ip", "entity_key": "203.0.113.50"},
+      "result_summary": "No profile for ip:203.0.113.50"
+    },
+    {
+      "step": 2,
+      "skill": "query_history_alerts",
+      "input": {"entity_type": "ip", "entity_key": "203.0.113.50", "window_hours": 24},
+      "result_summary": "Found 47 alerts in last 24h"
+    },
+    {
+      "step": 3,
+      "skill": "query_threat_intel",
+      "input": {"ioc_type": "ip", "ioc_value": "203.0.113.50"},
+      "result_summary": "verdict=unknown"
+    },
+    {
+      "step": 4,
+      "skill": "submit_conclusion",
+      "verdict": "likely_false_positive",
+      "reasoning": "High volume failed auth without successful login or intel hit."
+    }
+  ]
+}

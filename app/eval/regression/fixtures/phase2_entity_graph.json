@@ -1,0 +1,26 @@
+{
+  "steps": [
+    {
+      "skill": "query_entity_graph",
+      "input": {"seed_entity_type": "ip", "seed_entity_key": "10.0.1.10"}
+    },
+    {
+      "skill": "query_asset",
+      "input": {"entity_type": "ip", "entity_key": "10.0.1.10"}
+    },
+    {
+      "skill": "query_history_alerts",
+      "input": {"entity_type": "ip", "entity_key": "10.0.1.10", "window_hours": 72}
+    },
+    {
+      "skill": "query_threat_intel",
+      "input": {"ioc_type": "ip", "ioc_value": "10.0.1.10"}
+    },
+    {
+      "skill": "submit_conclusion",
+      "verdict": "attack_confirmed",
+      "reasoning": "Multiple failed auth from internal host with graph context.",
+      "refutation_summary": "Checked asset and graph; attack pattern persists."
+    }
+  ]
+}

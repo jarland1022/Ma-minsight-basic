@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.mmdb
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.db
+
+# Docker image exports (Gitee single-file limit 100MB)
+*.tar
+*.tar.gz
+ma-minsight-base.tar
+
+# TLS private keys (ECS-A)
+deploy/nginx/certs/
+
+# License (Pro)
+configs/license/*-private.pem
+configs/license/license.lic
+configs/license/.grace_*
+.grace_*

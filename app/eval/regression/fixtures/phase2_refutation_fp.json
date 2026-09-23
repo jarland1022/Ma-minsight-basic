@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "skill": "query_entity_graph",
+      "input": {"seed_entity_type": "ip", "seed_entity_key": "203.0.113.50"}
+    },
+    {
+      "skill": "query_asset",
+      "input": {"entity_type": "ip", "entity_key": "203.0.113.50"}
+    },
+    {
+      "skill": "query_history_alerts",
+      "input": {"entity_type": "ip", "entity_key": "203.0.113.50", "window_hours": 24}
+    },
+    {
+      "skill": "submit_conclusion",
+      "verdict": "likely_false_positive",
+      "reasoning": "Known scanner IP; refutation via asset/graph supports benign intent.",
+      "refutation_summary": "Asset marks known scanner; no successful compromise."
+    }
+  ]
+}

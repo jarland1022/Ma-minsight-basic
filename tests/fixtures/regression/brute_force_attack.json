@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {
+      "skill": "query_asset",
+      "input": {"entity_type": "ip", "entity_key": "203.0.113.99"}
+    },
+    {
+      "skill": "query_history_alerts",
+      "input": {"entity_type": "ip", "entity_key": "203.0.113.99", "window_hours": 24}
+    },
+    {
+      "skill": "submit_conclusion",
+      "verdict": "attack_confirmed",
+      "reasoning": "Successful login after brute force pattern."
+    }
+  ]
+}

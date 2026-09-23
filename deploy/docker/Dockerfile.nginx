@@ -1,0 +1,21 @@
+# MA-MinSight nginx image (React static + API reverse proxy)
+
+FROM node:20-alpine AS web
+WORKDIR /web
+COPY web/package.json ./
+# Strip UTF-8 BOM if present (Windows editors can break Vite/PostCSS JSON parsing on Linux).
+RUN node -e "const fs=require('fs');const p='package.json';let b=fs.readFileSync(p);if(b[0]===0xef&&b[1]===0xbb&&b[2]===0xbf){fs.writeFileSync(p,b.subarray(3));}"
+RUN npm install
+COPY web/ ./
+RUN node -e "const fs=require('fs');for(const p of['package.json','tsconfig.json','postcss.config.cjs']){try{let b=fs.readFileSync(p);if(b[0]===0xef&&b[1]===0xbb&&b[2]===0xbf)fs.writeFileSync(p,b.subarray(3));}catch{}}"
+RUN npm run build
+
+FROM nginx:1.25-alpine
+
+COPY deploy/nginx/ma-minsight.conf /etc/nginx/conf.d/default.conf
+COPY --from=web /web/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget -qO- http://127.0.0.1/ >/dev/null || exit 1

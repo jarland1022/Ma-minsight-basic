@@ -1,0 +1,38 @@
+# Git / IDE
+.git
+.gitignore
+.cursor
+.vscode
+*.md
+!README.md
+
+# Python
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.venv
+venv
+
+# Tests & dev
+tests/
+htmlcov/
+.coverage
+
+# Frontend (built in nginx stage)
+web/node_modules
+web/dist
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Docker
+docker-compose*.yml
+
+# Misc
+terminals
+agent-transcripts

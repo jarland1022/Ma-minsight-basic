@@ -1,0 +1,21 @@
+{
+  "_id": "wazuh-alert-web-003",
+  "timestamp": "2026-06-23T10:05:12.000Z",
+  "rule": {
+    "id": "31103",
+    "level": 12,
+    "description": "URL received from web server.",
+    "groups": ["web", "accesslog"]
+  },
+  "agent": {
+    "id": "003",
+    "name": "web-server-02",
+    "ip": "10.0.1.11"
+  },
+  "data": {
+    "srcip": "198.51.100.10",
+    "dstip": "10.0.1.11",
+    "url": "/admin/login.php"
+  },
+  "full_log": "GET /admin/login.php HTTP/1.1"
+}

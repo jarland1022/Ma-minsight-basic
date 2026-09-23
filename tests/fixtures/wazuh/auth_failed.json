@@ -1,0 +1,25 @@
+{
+  "_id": "wazuh-alert-auth-failed-001",
+  "timestamp": "2026-06-23T08:15:30.000Z",
+  "rule": {
+    "id": "5710",
+    "level": 10,
+    "description": "sshd: authentication failed.",
+    "groups": ["authentication_failed", "syslog", "sshd"]
+  },
+  "agent": {
+    "id": "001",
+    "name": "web-server-01",
+    "ip": "10.0.1.10"
+  },
+  "data": {
+    "srcip": "203.0.113.50",
+    "dstuser": "root",
+    "srcport": 54321
+  },
+  "decoder": {
+    "name": "sshd"
+  },
+  "location": "/var/log/auth.log",
+  "full_log": "Failed password for root from 203.0.113.50 port 54321 ssh2"
+}

@@ -1,0 +1,376 @@
+{
+  "version": 1,
+  "source": "MA-MinSight curated defensive playbooks",
+  "note": "Defensive investigation guidance only. Inspired by agentskills.io-style skill catalogs and community cybersecurity libraries; no offensive exploit content is included.",
+  "playbooks": [
+    {
+      "id": "inv-brute-force-auth",
+      "name": "暴力破解 / 认证失败复核",
+      "domain": "identity",
+      "alert_categories": ["brute_force", "authentication"],
+      "mitre_attack": ["T1110", "T1110.001", "T1078"],
+      "nist_csf": ["DE.CM", "RS.AN"],
+      "summary": "区分真实撞库/爆破与扫描器、健康检查、业务脚本造成的认证失败噪音。",
+      "investigation_steps": [
+        "确认源 IP、目标主机与账号归属，是否为已知漏扫或值班例外",
+        "查看同一实体 24h 内失败/成功登录比例及是否存在成功登录",
+        "沿实体关系检查是否横向触及其他主机或敏感系统",
+        "威胁情报仅作参考；unknown 不得直接定罪",
+        "证据不足时请求人工确认业务背景，再给结论"
+      ],
+      "runtime_skills": ["query_entity_graph", "query_asset", "query_history_alerts", "query_threat_intel"],
+      "human_questions": [
+        "该源 IP 是否为公司扫描器、WAF 健康检查或已知合作方？",
+        "目标账号是否处于批量运维/变更窗口？"
+      ],
+      "disposition_hints": ["建议观察并收紧规则例外", "若确认恶意建议封禁源 IP（需人工在设备执行）"]
+    },
+    {
+      "id": "inv-login-anomaly",
+      "name": "异常登录复核",
+      "domain": "identity",
+      "alert_categories": ["login_anomaly"],
+      "mitre_attack": ["T1078", "T1021"],
+      "nist_csf": ["DE.AE", "RS.AN"],
+      "summary": "核对非常规时间、地点或设备上的成功登录是否符合用户行为与授权。",
+      "investigation_steps": [
+        "核对账号、源地理位置、主机与登录时间是否异常",
+        "对比历史登录基线与同部门常见来源",
+        "检查是否伴随权限变更或敏感资源访问",
+        "向业务确认是否为本人或授权运维"
+      ],
+      "runtime_skills": ["query_entity_graph", "query_asset", "query_history_alerts"],
+      "human_questions": ["该时段登录是否为本人或授权同事操作？", "是否使用了未备案的 VPN / 跳板机？"],
+      "disposition_hints": ["建议要求二次验证", "若确认失陷建议禁用账号并重置凭证"]
+    },
+    {
+      "id": "inv-web-attack",
+      "name": "Web 攻击 / 扫描复核",
+      "domain": "web",
+      "alert_categories": ["web_attack"],
+      "mitre_attack": ["T1190", "T1595"],
+      "nist_csf": ["DE.CM", "PR.DS"],
+      "summary": "区分互联网扫描噪音与针对业务的真实 Web 利用尝试。",
+      "investigation_steps": [
+        "核对请求 URL、参数与规则命中原因",
+        "确认目标站点是否对公网暴露、是否为测试环境",
+        "查看同 IP 是否对多路径连续探测",
+        "结合威胁情报判断源地址信誉"
+      ],
+      "runtime_skills": ["query_entity_graph", "query_history_alerts", "query_threat_intel", "query_asset"],
+      "human_questions": ["该 URL 是否对公网开放？是否属于已知扫描任务？"],
+      "disposition_hints": ["建议 WAF 加强规则", "对确认恶意源建议封禁"]
+    },
+    {
+      "id": "inv-network-intrusion",
+      "name": "网络入侵 / IDS 告警复核",
+      "domain": "network",
+      "alert_categories": ["network_intrusion", "ids"],
+      "mitre_attack": ["T1046", "T1048", "T1071"],
+      "nist_csf": ["DE.CM", "RS.AN"],
+      "summary": "评估 IDS/IPS 告警是否对应真实入侵流量或已知误报特征。",
+      "investigation_steps": [
+        "核对源/目的、端口与签名含义",
+        "确认目的主机业务角色与是否预期流量",
+        "检索同会话相关历史告警",
+        "必要时请求网络侧确认变更窗口"
+      ],
+      "runtime_skills": ["query_asset", "query_history_alerts", "query_entity_graph", "query_threat_intel"],
+      "human_questions": ["该流量是否属于已知备份、同步或健康检查？"],
+      "disposition_hints": ["建议继续监控", "确认恶意后建议阻断会话并隔离主机"]
+    },
+    {
+      "id": "inv-firewall",
+      "name": "防火墙阻断 / 放行复核",
+      "domain": "network",
+      "alert_categories": ["firewall"],
+      "mitre_attack": ["T1046", "T1190"],
+      "nist_csf": ["PR.AC", "DE.CM"],
+      "summary": "判断防火墙告警是策略命中噪音还是异常外联/入站探测。",
+      "investigation_steps": [
+        "确认策略名称、动作（deny/allow）与对象",
+        "核对源目的是否在变更白名单内",
+        "查看是否重复高频命中同一五元组"
+      ],
+      "runtime_skills": ["query_asset", "query_history_alerts", "query_entity_graph"],
+      "human_questions": ["近期是否有网络策略或业务上线变更？"],
+      "disposition_hints": ["建议调整策略说明", "异常外联建议临时阻断并核查主机"]
+    },
+    {
+      "id": "inv-malware",
+      "name": "恶意软件告警复核",
+      "domain": "endpoint",
+      "alert_categories": ["malware"],
+      "mitre_attack": ["T1204", "T1059", "T1486"],
+      "nist_csf": ["DE.CM", "RS.MI"],
+      "summary": "核实杀软/EDR 检出是否为真实恶意样本，并评估扩散风险。",
+      "investigation_steps": [
+        "确认文件哈希、路径、进程与用户上下文",
+        "威胁情报查杀哈希与家族标签",
+        "检查同主机近期其他告警与实体邻居",
+        "评估是否需隔离主机（仅建议，不自动执行）"
+      ],
+      "runtime_skills": ["query_threat_intel", "query_asset", "query_entity_graph", "query_history_alerts", "simulate_disposition"],
+      "human_questions": ["该文件是否为业务安装包或安全测试样本？"],
+      "disposition_hints": ["建议隔离主机并清杀", "误报则加入哈希例外并反馈厂商"]
+    },
+    {
+      "id": "inv-file-integrity",
+      "name": "文件完整性变更复核",
+      "domain": "endpoint",
+      "alert_categories": ["file_integrity", "syscheck"],
+      "mitre_attack": ["T1565", "T1036", "T1543"],
+      "nist_csf": ["DE.CM", "PR.DS"],
+      "summary": "区分合法变更与可疑系统文件篡改。",
+      "investigation_steps": [
+        "确认变更路径、用户与时间是否落在变更窗口",
+        "对比历史同类变更频率",
+        "若为关键系统目录，提高调查优先级"
+      ],
+      "runtime_skills": ["query_asset", "query_history_alerts", "query_entity_graph"],
+      "human_questions": ["该变更是否有对应变更单或发布任务？"],
+      "disposition_hints": ["建议纳入变更白名单", "无变更记录则建议主机深度检查"]
+    },
+    {
+      "id": "inv-host-anomaly",
+      "name": "主机异常行为复核",
+      "domain": "endpoint",
+      "alert_categories": ["host_anomaly", "ossec"],
+      "mitre_attack": ["T1059", "T1547", "T1021"],
+      "nist_csf": ["DE.AE", "RS.AN"],
+      "summary": "分析主机侧异常进程、权限或持久化迹象。",
+      "investigation_steps": [
+        "核对主机角色、责任人与最近变更",
+        "沿实体图看是否关联异常登录或外联",
+        "检索同主机历史告警模式"
+      ],
+      "runtime_skills": ["query_entity_graph", "query_asset", "query_history_alerts"],
+      "human_questions": ["主机近期是否有补丁、Agent 升级或排障操作？"],
+      "disposition_hints": ["建议加强监控", "确认异常后建议隔离并取证"]
+    },
+    {
+      "id": "inv-windows-event",
+      "name": "Windows 安全事件复核",
+      "domain": "endpoint",
+      "alert_categories": ["windows_event"],
+      "mitre_attack": ["T1078", "T1003", "T1484"],
+      "nist_csf": ["DE.CM", "PR.AC"],
+      "summary": "解读 Windows 安全日志告警，排除域策略与运维噪音。",
+      "investigation_steps": [
+        "核对事件 ID 含义与主体账号",
+        "确认是否域控/服务器上的预期管理行为",
+        "检查是否伴随大规模失败认证或权限提升"
+      ],
+      "runtime_skills": ["query_asset", "query_history_alerts", "query_entity_graph"],
+      "human_questions": ["是否有域策略或账号批量调整？"],
+      "disposition_hints": ["建议核对 AD 审计", "异常权限建议禁用相关账号"]
+    },
+    {
+      "id": "inv-privilege-escalation",
+      "name": "权限提升复核",
+      "domain": "identity",
+      "alert_categories": ["privilege_escalation"],
+      "mitre_attack": ["T1068", "T1078", "T1548"],
+      "nist_csf": ["PR.AC", "RS.AN"],
+      "summary": "核实提权行为是否授权，评估对敏感系统的影响面。",
+      "investigation_steps": [
+        "确认提权前后账号角色与目标资源",
+        "实体图扩展到业务系统与对等主机",
+        "必要时做处置影响推演后再建议隔离"
+      ],
+      "runtime_skills": ["query_entity_graph", "query_asset", "query_history_alerts", "simulate_disposition"],
+      "human_questions": ["该提权是否有变更审批？"],
+      "disposition_hints": ["未授权提权建议禁用账号并回收权限"]
+    },
+    {
+      "id": "inv-data-exfiltration",
+      "name": "数据外传嫌疑复核",
+      "domain": "data",
+      "alert_categories": ["data_exfiltration"],
+      "mitre_attack": ["T1041", "T1567", "T1020"],
+      "nist_csf": ["PR.DS", "RS.AN"],
+      "summary": "评估异常出站传输是否为业务同步或真实外传。",
+      "investigation_steps": [
+        "确认目标地址、体积与时段",
+        "核对本机业务是否有合法同步任务",
+        "情报查询目标域名/IP",
+        "高影响阻断前先做处置推演"
+      ],
+      "runtime_skills": ["query_threat_intel", "query_asset", "query_entity_graph", "query_history_alerts", "simulate_disposition"],
+      "human_questions": ["是否存在备份、CDN 或合作方同步？"],
+      "disposition_hints": ["建议临时阻断外联并取证"]
+    },
+    {
+      "id": "inv-syslog-noise",
+      "name": "Syslog / 通用日志噪音复核",
+      "domain": "ops",
+      "alert_categories": ["syslog", "uncategorized"],
+      "mitre_attack": ["T1078"],
+      "nist_csf": ["DE.CM"],
+      "summary": "快速判断通用日志告警是否可降噪或需要升级调查。",
+      "investigation_steps": [
+        "确认规则含义与重复频率",
+        "核对资产是否关键",
+        "若长期误报计入规则噪音优化清单"
+      ],
+      "runtime_skills": ["query_asset", "query_history_alerts"],
+      "human_questions": ["该规则是否已知噪音，是否可加例外？"],
+      "disposition_hints": ["建议优化检测规则或白名单"]
+    },
+    {
+      "id": "inv-compliance",
+      "name": "合规类告警复核",
+      "domain": "compliance",
+      "alert_categories": ["compliance", "pci_dss"],
+      "mitre_attack": [],
+      "nist_csf": ["GV.OC", "ID.RA"],
+      "summary": "区分合规检查告警与真实安全事件，避免过度研判。",
+      "investigation_steps": [
+        "确认控件要求与告警字段",
+        "判断是否配置漂移或审计缺失",
+        "一般不按攻击结论处置，输出整改建议"
+      ],
+      "runtime_skills": ["query_asset", "query_history_alerts"],
+      "human_questions": ["该合规项是否有已知豁免或整改计划？"],
+      "disposition_hints": ["建议转合规整改跟踪"]
+    },
+    {
+      "id": "inv-lateral-movement",
+      "name": "横向移动迹象复核",
+      "domain": "identity",
+      "alert_categories": ["lateral_movement"],
+      "mitre_attack": ["T1021", "T1570", "T1550"],
+      "nist_csf": ["DE.AE", "RS.AN"],
+      "summary": "沿实体关系还原主机间异常跳转路径。",
+      "investigation_steps": [
+        "优先调用实体关系图还原路径",
+        "核对源账号权限与目标系统敏感度",
+        "结合历史告警判断是否连续推进"
+      ],
+      "runtime_skills": ["query_entity_graph", "query_asset", "query_history_alerts", "query_threat_intel"],
+      "human_questions": ["运维是否在进行批量巡检或跳板操作？"],
+      "disposition_hints": ["建议隔离关键主机并重置凭证"]
+    },
+    {
+      "id": "inv-phishing-bec",
+      "name": "钓鱼 / 商务邮件欺诈线索复核",
+      "domain": "email",
+      "alert_categories": ["phishing", "bec"],
+      "mitre_attack": ["T1566", "T1534"],
+      "nist_csf": ["PR.AT", "RS.AN"],
+      "summary": "在告警含邮件或社工线索时，核验发件人与业务付款/授权上下文。",
+      "investigation_steps": [
+        "核对发件域、回复地址与历史通信模式",
+        "确认涉及账号是否异常登录",
+        "向业务核实付款或授权请求真伪"
+      ],
+      "runtime_skills": ["query_asset", "query_history_alerts", "query_threat_intel", "query_entity_graph"],
+      "human_questions": ["该邮件请求是否经过财务/上级双人确认？"],
+      "disposition_hints": ["建议隔离邮件并重置相关账号"]
+    },
+    {
+      "id": "inv-cloud-access",
+      "name": "云控制台 / API 异常访问复核",
+      "domain": "cloud",
+      "alert_categories": ["cloud_access", "cloud"],
+      "mitre_attack": ["T1078.004", "T1580"],
+      "nist_csf": ["PR.AC", "DE.CM"],
+      "summary": "评估云身份异常调用是否为自动化任务或凭证滥用。",
+      "investigation_steps": [
+        "确认身份、API 动作与来源 IP",
+        "核对是否 CI/CD 或运维自动化",
+        "评估影响的云资源范围"
+      ],
+      "runtime_skills": ["query_asset", "query_history_alerts", "query_entity_graph", "query_threat_intel"],
+      "human_questions": ["该 Access Key / 角色是否用于流水线？"],
+      "disposition_hints": ["建议轮换密钥并收紧策略"]
+    },
+    {
+      "id": "inv-dns-c2",
+      "name": "DNS / C2 通信嫌疑复核",
+      "domain": "network",
+      "alert_categories": ["dns", "c2"],
+      "mitre_attack": ["T1071.004", "T1568"],
+      "nist_csf": ["DE.CM", "RS.MI"],
+      "summary": "判断异常 DNS 查询是否为隧道、C2 或误报解析。",
+      "investigation_steps": [
+        "核对域名、解析结果与查询频率",
+        "威胁情报查询域名信誉",
+        "关联发起主机进程/用户（若有）"
+      ],
+      "runtime_skills": ["query_threat_intel", "query_asset", "query_history_alerts", "query_entity_graph"],
+      "human_questions": ["是否为新业务域名或 CDN 探测？"],
+      "disposition_hints": ["建议阻断域名并隔离主机"]
+    },
+    {
+      "id": "inv-ransomware-early",
+      "name": "勒索早期迹象复核",
+      "domain": "endpoint",
+      "alert_categories": ["ransomware"],
+      "mitre_attack": ["T1486", "T1490", "T1080"],
+      "nist_csf": ["RS.MI", "RC.RP"],
+      "summary": "在大量文件变更或影子副本删除等迹象出现时快速评估。",
+      "investigation_steps": [
+        "确认文件变更规模与备份删除迹象",
+        "实体图扩展影响主机群",
+        "处置推演后再建议隔离范围"
+      ],
+      "runtime_skills": ["query_entity_graph", "query_asset", "query_history_alerts", "simulate_disposition"],
+      "human_questions": ["近期是否有大规模归档或迁移任务？"],
+      "disposition_hints": ["建议立即隔离主机群并启动备份恢复预案"]
+    },
+    {
+      "id": "inv-supply-chain",
+      "name": "供应链 / 第三方组件嫌疑复核",
+      "domain": "supply_chain",
+      "alert_categories": ["supply_chain"],
+      "mitre_attack": ["T1195"],
+      "nist_csf": ["ID.SC", "RS.AN"],
+      "summary": "评估第三方包、镜像或更新源相关告警的可信度。",
+      "investigation_steps": [
+        "核对组件来源、版本与发布渠道",
+        "情报查询已知供应链事件",
+        "确认部署范围与回滚可行性"
+      ],
+      "runtime_skills": ["query_threat_intel", "query_asset", "query_entity_graph"],
+      "human_questions": ["该组件是否来自官方源与锁定版本？"],
+      "disposition_hints": ["建议暂停部署并回滚可疑版本"]
+    },
+    {
+      "id": "inv-insider-risk",
+      "name": "内部人员风险线索复核",
+      "domain": "identity",
+      "alert_categories": ["insider", "ueba"],
+      "mitre_attack": ["T1078", "T1530"],
+      "nist_csf": ["PR.AC", "DE.AE"],
+      "summary": "在账号行为偏离同侪时，优先业务核实而非直接定罪。",
+      "investigation_steps": [
+        "核对账号职责与资源访问是否越权",
+        "实体关系看部门与业务系统边界",
+        "必须人工核实后再确认攻击结论"
+      ],
+      "runtime_skills": ["query_entity_graph", "query_asset", "query_history_alerts"],
+      "human_questions": ["该同事是否临时借调/项目授权？"],
+      "disposition_hints": ["建议限制敏感权限并约谈核实"]
+    },
+    {
+      "id": "inv-generic-deep-review",
+      "name": "通用深度复核基线",
+      "domain": "general",
+      "alert_categories": ["*"],
+      "mitre_attack": ["TA0001"],
+      "nist_csf": ["RS.AN"],
+      "summary": "无专用剧本时的默认调查基线：实体关联 → 资产 → 历史 → 情报 → 结论。",
+      "investigation_steps": [
+        "建立实体关系上下文",
+        "核对资产与值班知识",
+        "检索历史告警与关联事件",
+        "查询威胁情报",
+        "证据不足则发起协查，充足则提交结构化结论"
+      ],
+      "runtime_skills": ["query_entity_graph", "query_asset", "query_history_alerts", "query_threat_intel"],
+      "human_questions": ["请补充业务背景：是否授权、是否已知任务、是否测试环境？"],
+      "disposition_hints": ["仅输出建议动作，不自动执行"]
+    }
+  ]
+}

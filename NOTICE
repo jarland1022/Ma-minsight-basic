@@ -1,0 +1,11 @@
+MA-MinSight Community
+Copyright 2026 MinAnSec / MA-MinSight contributors
+
+This product includes software developed by third parties, including but not
+limited to FastAPI, SQLAlchemy, React, Ant Design, and Redis clients. Their
+respective licenses apply to those components.
+
+MA-MinSight Community source in this repository is licensed under the Apache
+License 2.0. That license does not grant rights to MA-MinSight Professional
+features (AI Agent investigation, WeCom human review, defense-asset learning,
+eval suite, and commercial support), which require a separate commercial license.

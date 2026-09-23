@@ -1,0 +1,91 @@
+﻿# MA-MinSight production stack (single-tenant ECS / VM)
+# Usage: cp deploy/env/production.env.example .env && docker compose up -d --build
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ma_minsight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-ma_minsight}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ma_minsight} -d ${POSTGRES_DB:-ma_minsight}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - internal
+
+  app:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ma_minsight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-ma_minsight}
+      REDIS_URL: redis://redis:6379/0
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      GEOLITE2_CITY_PATH: ${GEOLITE2_CITY_PATH:-/data/geoip/GeoLite2-City.mmdb}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    volumes:
+      # Host file path is configurable; container path must match GEOLITE2_CITY_PATH.
+      - ${GEOLITE2_HOST_PATH:-./data/geoip/GeoLite2-City.mmdb}:/data/geoip/GeoLite2-City.mmdb:ro
+    networks:
+      - internal
+
+  nginx:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.nginx
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - internal
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  internal:
+    driver: bridge

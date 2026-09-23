@@ -1,0 +1,21 @@
+{
+  "_id": "wazuh-alert-syscheck-002",
+  "timestamp": "2026-06-23T09:20:00.000Z",
+  "rule": {
+    "id": "550",
+    "level": 7,
+    "description": "Integrity checksum changed.",
+    "groups": ["syscheck", "ossec"]
+  },
+  "agent": {
+    "id": "002",
+    "name": "db-server-01",
+    "ip": "10.0.2.20"
+  },
+  "syscheck": {
+    "path": "/etc/passwd",
+    "sha256_after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "data": {},
+  "full_log": "ossec: syscheck integrity checksum changed"
+}

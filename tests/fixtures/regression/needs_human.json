@@ -1,0 +1,14 @@
+{
+  "steps": [
+    {
+      "skill": "query_asset",
+      "input": {"entity_type": "ip", "entity_key": "198.51.100.10"}
+    },
+    {
+      "skill": "submit_conclusion",
+      "verdict": "needs_human_review",
+      "reasoning": "Ambiguous web access pattern.",
+      "human_query": "请确认 /admin 路径是否为授权测试？"
+    }
+  ]
+}

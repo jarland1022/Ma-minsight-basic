@@ -1,0 +1,14 @@
+{
+  "steps": [
+    {
+      "skill": "query_asset",
+      "input": {"entity_type": "user", "entity_key": "admin"}
+    },
+    {
+      "skill": "submit_conclusion",
+      "verdict": "insufficient_information",
+      "reasoning": "Geo login anomaly without asset context.",
+      "human_query": "请确认该账号是否授权异地登录？"
+    }
+  ]
+}

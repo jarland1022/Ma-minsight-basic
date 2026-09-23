@@ -1,0 +1,1 @@
+"""Event aggregation layer."""

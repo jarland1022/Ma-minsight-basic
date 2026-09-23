@@ -1,0 +1,2 @@
+{"from_entity_type": "user", "from_entity_key": "zhangsan", "to_entity_type": "host", "to_entity_key": "web-server-01", "relation_type": "owns", "confidence": 0.95, "source": "manual", "metadata": {"department": "采购部"}}
+{"from_entity_type": "host", "from_entity_key": "web-server-01", "to_entity_type": "host", "to_entity_key": "finance-server-01", "relation_type": "business_peer", "confidence": 0.8, "source": "import"}
