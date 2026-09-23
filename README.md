@@ -72,7 +72,7 @@ LICENSE / NOTICE     # Apache-2.0
 
 ## 相关产品
 
-- [Ma-WAF Community](https://github.com/) — 开源 WAF 社区版（可按你的实际仓库地址修改）
+- [Ma-WAF Community](https://github.com/jarland1022/Ma-waf-basic.git) — 开源 WAF 社区版
 - SIEM：推荐自建 Wazuh；MinSight 是 SIEM **之上的分诊层**，不是又一个 SIEM。
 
 ## 许可
