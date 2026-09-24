@@ -32,9 +32,13 @@ export type AlertDetailRow = {
   severity?: number | null;
   occurred_at?: string | null;
   src_ip?: string | null;
+  dst_ip?: string | null;
+  dst_port?: number | null;
   src_geo?: string | null;
   user_name?: string | null;
   host_name?: string | null;
+  process_name?: string | null;
+  file_hash?: string | null;
   request_url?: string | null;
 };
 
@@ -65,12 +69,15 @@ export type InvestigationRow = {
     reasoning?: string | null;
     human_query?: string | null;
     recommended_action?: string | null;
+    evidence_refs?: string[] | null;
     evidence_closure_score?: number | null;
     refutation_coverage?: number | null;
     closure_passed?: boolean | null;
     closure_checks?: Record<string, unknown> | null;
     hypotheses_evaluated?: unknown[] | null;
     refutation_summary?: string | null;
+    evidence_strength?: string | null;
+    disposition_grade?: string | null;
   } | null;
   supervisor_audits?: SupervisorAuditRow[];
   disposition_simulations?: DispositionSimulationRow[];

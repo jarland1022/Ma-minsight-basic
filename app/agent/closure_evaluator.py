@@ -113,7 +113,8 @@ class ClosureEvaluator:
         ):
             passed = False
             rejection_reasons.append(
-                "确认攻击前需至少尝试一条反证调查（如 query_asset / query_entity_graph）"
+                "确认攻击前需至少尝试一条反证调查"
+                "（如 query_asset / query_entity_graph / query_behavior_timeline）"
             )
 
         if (

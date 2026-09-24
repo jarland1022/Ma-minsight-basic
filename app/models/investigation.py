@@ -268,6 +268,8 @@ class InvestigationConclusion(Base, CreatedAtMixin):
     refutation_coverage: Mapped[float | None] = mapped_column(Float, nullable=True)
     closure_checks: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     closure_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    evidence_strength: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    disposition_grade: Mapped[str | None] = mapped_column(String(64), nullable=True)
     is_overridden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     overridden_by_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),

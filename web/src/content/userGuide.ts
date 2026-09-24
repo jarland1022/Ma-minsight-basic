@@ -15,10 +15,46 @@ export const EVENT_STATUS_GUIDE: Record<string, string> = {
   closed: "已关闭：该事件处理流程结束，一般无需再操作。",
 };
 
+export const DISPOSITION_GRADE_GUIDE: Record<
+  string,
+  { label: string; color: string; action: string; sla: string }
+> = {
+  confirmed_compromise: {
+    label: "确认失陷",
+    color: "red",
+    action: "建议隔离主机、重置凭据、全盘取证（需人工确认后执行）",
+    sla: "立即",
+  },
+  suspicious: {
+    label: "可疑",
+    color: "orange",
+    action: "建议封禁外连目标、持续监控、补充证据",
+    sla: "24 小时内",
+  },
+  false_positive: {
+    label: "误报",
+    color: "green",
+    action: "记录原因、优化规则 / 确认白名单候选",
+    sla: "当日",
+  },
+  needs_more_evidence: {
+    label: "待补充证据",
+    color: "gold",
+    action: "回复协查问题或补充日志/业务背景后再定性",
+    sla: "尽快",
+  },
+};
+
+export const EVIDENCE_STRENGTH_GUIDE: Record<string, { label: string; color: string }> = {
+  multi_path: { label: "多路证据", color: "blue" },
+  single_path: { label: "单路孤证", color: "orange" },
+  none: { label: "证据不足", color: "default" },
+};
+
 export const VERDICT_GUIDE: Record<string, { label: string; meaning: string; action: string }> = {
   attack_confirmed: {
     label: "确认攻击",
-    meaning: "AI 认为有较充分证据表明存在恶意或异常行为。",
+    meaning: "AI 认为有较充分证据表明存在恶意或异常行为（通常要求多路独立证据交叉验证）。",
     action: "请阅读推理说明，在「防御资产」确认是否采纳处置建议；高影响操作需与运维/业务负责人沟通后再执行。",
   },
   likely_false_positive: {
@@ -90,7 +126,9 @@ export const PAGE_GUIDES: Record<string, GuideSection> = {
     steps: [
       "「事件工作台」：先看匹配的调查剧本、事件过程、实体关系和证据缺口，再决定要不要协查。",
       "「关联告警」：原始安全设备报出的规则名、源 IP 等，点击行可看单条告警详情。",
-      "「Agent 复核结论」：AI 的最终或阶段性判断，重点看 verdict 标签和 reasoning 说明。",
+      "「Agent 复核结论」：看 verdict、处置分级、证据强度标签；确认攻击通常要求多路证据。",
+      "有文件哈希/进程时，调查会走样本富化路径（无沙箱时不会编造动态分析结果）。",
+      "「处置分级速查」：确认失陷 / 可疑 / 误报 / 待补充的建议动作与时限，仍须人工确认后执行。",
       "「协查问题」出现且状态为协查中：在本页或「人工协查」提交回复。",
       "「处置建议」：AI 的运维建议（如建议观察、建议隔离），点「确认」表示您已知晓并采纳记录，不会自动执行。",
     ],

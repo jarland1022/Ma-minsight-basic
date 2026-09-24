@@ -10,6 +10,8 @@ import type {
 } from "../types/api";
 
 const SKILL_LABEL: Record<string, string> = {
+  query_behavior_timeline: "先整理告警前后行为时间线，并回原文核对时间戳",
+  query_sample_enrichment: "核对样本哈希/进程线索（有哈希才查情报，无沙箱勿编造）",
   query_asset: "核对该 IP/主机是否为已知资产、扫描器或值班例外",
   query_threat_intel: "查源地址是否被威胁情报标为恶意",
   query_entity_graph: "沿实体关系看它还连到哪些主机、账号或业务系统",

@@ -35,6 +35,10 @@ def _default_license_dir() -> Path:
     override = os.environ.get("MA_MINSIGHT_LICENSE_DIR", "").strip()
     if override:
         return Path(override)
+    # Prefer process cwd (Docker WORKDIR / local compose) when configs/ exists there.
+    cwd_dir = Path.cwd() / "configs" / "license"
+    if cwd_dir.is_dir() or (Path.cwd() / "configs").is_dir():
+        return cwd_dir
     return _repo_root() / "configs" / "license"
 
 

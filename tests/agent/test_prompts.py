@@ -84,3 +84,14 @@ def test_prompt_includes_matched_playbook() -> None:
 def test_user_prompt_reminds_simulation_when_enabled() -> None:
     prompt = build_user_prompt(_ctx(simulation_enabled=True))
     assert "simulate_disposition" in prompt
+
+
+def test_prompt_includes_methodology_and_timeline() -> None:
+    prompt = build_system_prompt(_ctx(simulation_enabled=False))
+    assert "五步研判流程" in prompt
+    assert "四路证据交叉验证" in prompt
+    assert "防幻觉校验清单" in prompt
+    assert "query_behavior_timeline" in prompt
+    assert "multi_path" in prompt
+    user = build_user_prompt(_ctx(simulation_enabled=False))
+    assert "query_behavior_timeline" in user

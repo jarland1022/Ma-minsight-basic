@@ -23,6 +23,9 @@ class AlertBrief(BaseModel):
     alert_category: str | None = None
     triage_rule_score: float | None = None
     triage_route: str | None = None
+    dst_ip: str | None = None
+    process_name: str | None = None
+    file_hash: str | None = None
 
 
 class EventBrief(BaseModel):

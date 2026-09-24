@@ -168,7 +168,10 @@ class InvestigationOrchestrator:
             else {
                 "verdict": inv.conclusion.verdict.value,
                 "reasoning": inv.conclusion.reasoning,
+                "recommended_action": inv.conclusion.recommended_action,
                 "evidence_refs": inv.conclusion.evidence_refs,
+                "evidence_strength": inv.conclusion.evidence_strength,
+                "disposition_grade": inv.conclusion.disposition_grade,
                 "hypotheses_evaluated": inv.conclusion.hypotheses_evaluated,
                 "refutation_summary": inv.conclusion.refutation_summary,
                 "evidence_closure_score": inv.conclusion.evidence_closure_score,
@@ -315,5 +318,7 @@ class InvestigationOrchestrator:
                 refutation_coverage=refutation_cov,
                 closure_checks=closure_checks,
                 closure_passed=closure_passed,
+                evidence_strength=conclusion.evidence_strength,
+                disposition_grade=conclusion.disposition_grade,
             )
         )

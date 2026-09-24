@@ -19,6 +19,8 @@ COPY pyproject.toml README.md ./
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
+# Public verify key (+ optional customer license.lic at runtime via volume). Never bake private keys.
+COPY configs/license ./configs/license
 
 RUN pip install --upgrade pip \
     && pip install --no-cache-dir .

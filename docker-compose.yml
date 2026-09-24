@@ -50,6 +50,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       GEOLITE2_CITY_PATH: ${GEOLITE2_CITY_PATH:-/data/geoip/GeoLite2-City.mmdb}
+      MA_MINSIGHT_LICENSE_DIR: /app/configs/license
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,6 +67,8 @@ services:
     volumes:
       # Host file path is configurable; container path must match GEOLITE2_CITY_PATH.
       - ${GEOLITE2_HOST_PATH:-./data/geoip/GeoLite2-City.mmdb}:/data/geoip/GeoLite2-City.mmdb:ro
+      # Persist License / public PEM across rebuilds (never commit private keys or license.lic).
+      - ./configs/license:/app/configs/license
     networks:
       - internal
 

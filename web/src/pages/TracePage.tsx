@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
 import PageBackHeader from "../components/PageBackHeader";
+import { DispositionGradeTag, EvidenceStrengthTag, VerdictTag } from "../components/VerdictLabels";
 
 type TracePayload = {
   event_id?: string;
@@ -15,6 +16,10 @@ type TracePayload = {
   conclusion?: {
     verdict?: string;
     reasoning?: string;
+    recommended_action?: string | null;
+    evidence_refs?: string[] | null;
+    evidence_strength?: string | null;
+    disposition_grade?: string | null;
     evidence_closure_score?: number | null;
     refutation_coverage?: number | null;
     closure_passed?: boolean | null;
@@ -50,7 +55,9 @@ export default function TracePage() {
       {data.conclusion && (
         <Card title="结论与证据闭合度">
           <Typography.Paragraph>
-            <Tag color="blue">{data.conclusion.verdict}</Tag>
+            <VerdictTag verdict={data.conclusion.verdict} />
+            <DispositionGradeTag grade={data.conclusion.disposition_grade} />
+            <EvidenceStrengthTag strength={data.conclusion.evidence_strength} />
             {data.conclusion.closure_passed != null && (
               <Tag color={data.conclusion.closure_passed ? "green" : "orange"}>
                 闭合 {data.conclusion.closure_passed ? "通过" : "未通过"}
@@ -73,6 +80,20 @@ export default function TracePage() {
               反证摘要：{data.conclusion.refutation_summary}
             </Typography.Paragraph>
           )}
+          {data.conclusion.recommended_action && (
+            <Typography.Paragraph>
+              <Typography.Text strong>处置建议：</Typography.Text>
+              {data.conclusion.recommended_action}
+            </Typography.Paragraph>
+          )}
+          {(data.conclusion.evidence_refs?.length ?? 0) > 0 && (
+            <Typography.Paragraph>
+              <Typography.Text strong>证据引用：</Typography.Text>
+              {data.conclusion.evidence_refs!.map((ref) => (
+                <Tag key={ref}>{ref}</Tag>
+              ))}
+            </Typography.Paragraph>
+          )}
           {closureChecks && (
             <Typography.Paragraph>
               <Typography.Text strong>closure_checks：</Typography.Text>
@@ -81,46 +102,44 @@ export default function TracePage() {
               </pre>
             </Typography.Paragraph>
           )}
-        </Card>
-      )}
-
-      {data.sop?.hypothesis_template && (
-        <Card title={`SOP 假设模板 · ${data.sop.name ?? ""}`}>
-          <Typography.Paragraph type="secondary">
-            推荐 Skill：{(data.sop.recommended_skills ?? []).join(", ")}
-          </Typography.Paragraph>
-          <pre style={{ whiteSpace: "pre-wrap" }}>
-            {JSON.stringify(data.sop.hypothesis_template, null, 2)}
-          </pre>
+          {data.conclusion.reasoning && (
+            <Typography.Paragraph>{data.conclusion.reasoning}</Typography.Paragraph>
+          )}
         </Card>
       )}
 
       <Row gutter={16}>
-        <Col span={14}>
-          <Card title="ReAct 对话流">
+        <Col span={12}>
+          <Card title="消息轨迹">
             <List
+              size="small"
               dataSource={data.messages ?? []}
-              renderItem={(m) => (
+              renderItem={(item) => (
                 <List.Item>
-                  <List.Item.Meta
-                    title={<Tag>{m.role}</Tag>}
-                    description={<pre style={{ whiteSpace: "pre-wrap" }}>{m.content}</pre>}
-                  />
+                  <Space direction="vertical" style={{ width: "100%" }}>
+                    <Tag>{item.role}</Tag>
+                    <Typography.Paragraph style={{ marginBottom: 0, whiteSpace: "pre-wrap" }}>
+                      {item.content}
+                    </Typography.Paragraph>
+                  </Space>
                 </List.Item>
               )}
             />
           </Card>
         </Col>
-        <Col span={10}>
+        <Col span={12}>
           <Card title="Skill 调用">
             <List
+              size="small"
               dataSource={data.tool_calls ?? []}
-              renderItem={(t) => (
+              renderItem={(item) => (
                 <List.Item>
-                  <Typography.Text strong>
-                    #{t.step} {t.skill_name} {t.success ? "✓" : "✗"}
-                  </Typography.Text>
-                  <div>{t.output_summary}</div>
+                  <Space direction="vertical" style={{ width: "100%" }}>
+                    <span>
+                      #{item.step} <Tag color={item.success ? "green" : "red"}>{item.skill_name}</Tag>
+                    </span>
+                    <Typography.Text type="secondary">{item.output_summary}</Typography.Text>
+                  </Space>
                 </List.Item>
               )}
             />

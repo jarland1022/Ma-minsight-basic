@@ -1,5 +1,9 @@
 import { Tag } from "antd";
-import { VERDICT_GUIDE } from "../content/userGuide";
+import {
+  DISPOSITION_GRADE_GUIDE,
+  EVIDENCE_STRENGTH_GUIDE,
+  VERDICT_GUIDE,
+} from "../content/userGuide";
 
 export function verdictLabel(verdict: string | null | undefined): string {
   if (!verdict) return "—";
@@ -22,6 +26,22 @@ export function VerdictTag({ verdict }: { verdict: string | null | undefined }) 
       {info?.label ?? verdict}
     </Tag>
   );
+}
+
+export function DispositionGradeTag({ grade }: { grade: string | null | undefined }) {
+  if (!grade) return null;
+  const info = DISPOSITION_GRADE_GUIDE[grade];
+  return (
+    <Tag color={info?.color || "default"} title={info?.action}>
+      {info?.label ?? grade}
+    </Tag>
+  );
+}
+
+export function EvidenceStrengthTag({ strength }: { strength: string | null | undefined }) {
+  if (!strength) return null;
+  const info = EVIDENCE_STRENGTH_GUIDE[strength];
+  return <Tag color={info?.color || "default"}>{info?.label ?? strength}</Tag>;
 }
 
 export function eventStatusLabel(status: string | null | undefined): string {

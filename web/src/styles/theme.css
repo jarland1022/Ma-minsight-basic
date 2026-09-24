@@ -285,6 +285,34 @@ body,
   overflow: auto;
 }
 
+.ms-license-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+}
+
+.ms-license-banner.warn {
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  color: #ad6800;
+}
+
+.ms-license-banner.error {
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  color: #a8071a;
+}
+
+.ms-license-banner a {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
 .ms-crumb {
   color: var(--muted);
   font-size: 0.8rem;

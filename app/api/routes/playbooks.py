@@ -5,7 +5,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.deps import require_auth
-from app.playbooks.loader import catalog_meta, get_playbook, list_playbooks, match_playbooks
+from app.playbooks.loader import (
+    attack_coverage,
+    catalog_meta,
+    get_playbook,
+    list_playbooks,
+    match_playbooks,
+)
 
 router = APIRouter(prefix="/api/v1/playbooks", tags=["playbooks"])
 
@@ -14,11 +20,12 @@ router = APIRouter(prefix="/api/v1/playbooks", tags=["playbooks"])
 async def list_playbooks_api(
     category: str | None = None,
     domain: str | None = None,
+    pack: str | None = None,
 ) -> dict:
     meta = catalog_meta()
     return {
         **meta,
-        "items": list_playbooks(category=category, domain=domain),
+        "items": list_playbooks(category=category, domain=domain, pack=pack),
     }
 
 
@@ -28,6 +35,12 @@ async def match_playbooks_api(
     limit: int = Query(default=3, ge=1, le=10),
 ) -> dict:
     return {"category": category, "items": match_playbooks(category, limit=limit)}
+
+
+@router.get("/coverage", dependencies=[Depends(require_auth)])
+async def attack_coverage_api(pack: str | None = None) -> dict:
+    """ATT&CK coverage board for the skill / playbook catalog."""
+    return attack_coverage(pack=pack)
 
 
 @router.get("/{playbook_id}", dependencies=[Depends(require_auth)])

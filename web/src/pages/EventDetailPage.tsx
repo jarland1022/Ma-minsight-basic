@@ -18,8 +18,8 @@ import { api } from "../api/client";
 import EventWorkspace from "../components/EventWorkspace";
 import PageBackHeader from "../components/PageBackHeader";
 import UserGuidePanel from "../components/UserGuidePanel";
-import { VerdictTag, eventStatusLabel } from "../components/VerdictLabels";
-import { PAGE_GUIDES, VERDICT_GUIDE } from "../content/userGuide";
+import { VerdictTag, DispositionGradeTag, EvidenceStrengthTag, eventStatusLabel } from "../components/VerdictLabels";
+import { DISPOSITION_GRADE_GUIDE, EVIDENCE_STRENGTH_GUIDE, PAGE_GUIDES, VERDICT_GUIDE } from "../content/userGuide";
 import type { AlertDetailRow, DispositionRow, EventDetail } from "../types/api";
 
 export default function EventDetailPage() {
@@ -191,9 +191,18 @@ export default function EventDetailPage() {
               <Descriptions.Item label="规则">{selectedAlert.rule_name}</Descriptions.Item>
               <Descriptions.Item label="严重度">{selectedAlert.severity}</Descriptions.Item>
               <Descriptions.Item label="源 IP">{selectedAlert.src_ip || "-"}</Descriptions.Item>
+              <Descriptions.Item label="目的">
+                {selectedAlert.dst_ip
+                  ? `${selectedAlert.dst_ip}${selectedAlert.dst_port ? `:${selectedAlert.dst_port}` : ""}`
+                  : "-"}
+              </Descriptions.Item>
               <Descriptions.Item label="归属地">{selectedAlert.src_geo || "-"}</Descriptions.Item>
               <Descriptions.Item label="主机">{selectedAlert.host_name || "-"}</Descriptions.Item>
               <Descriptions.Item label="用户">{selectedAlert.user_name || "-"}</Descriptions.Item>
+              <Descriptions.Item label="进程">{selectedAlert.process_name || "-"}</Descriptions.Item>
+              <Descriptions.Item label="文件哈希" span={2}>
+                {selectedAlert.file_hash || "-"}
+              </Descriptions.Item>
               <Descriptions.Item label="URL">{selectedAlert.request_url || "-"}</Descriptions.Item>
               <Descriptions.Item label="初筛路由">
                 <Tag>{selectedAlert.triage_route}</Tag>
@@ -209,6 +218,9 @@ export default function EventDetailPage() {
           <Typography.Paragraph>
             <VerdictTag verdict={latestInv.conclusion.verdict} /> 置信度{" "}
             {latestInv.conclusion.confidence}
+            {" "}
+            <DispositionGradeTag grade={latestInv.conclusion.disposition_grade} />
+            <EvidenceStrengthTag strength={latestInv.conclusion.evidence_strength} />
             {latestInv.conclusion.closure_passed != null && (
               <>
                 {" "}
@@ -234,6 +246,58 @@ export default function EventDetailPage() {
               }
             />
           )}
+          {latestInv.conclusion.disposition_grade &&
+            DISPOSITION_GRADE_GUIDE[latestInv.conclusion.disposition_grade] && (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message={`处置分级：${DISPOSITION_GRADE_GUIDE[latestInv.conclusion.disposition_grade].label}`}
+                description={
+                  <>
+                    {DISPOSITION_GRADE_GUIDE[latestInv.conclusion.disposition_grade].action}
+                    <br />
+                    <strong>建议时限：</strong>
+                    {DISPOSITION_GRADE_GUIDE[latestInv.conclusion.disposition_grade].sla}
+                    （处置仍须人工确认，系统不会自动执行）
+                  </>
+                }
+              />
+            )}
+          {latestInv.conclusion.evidence_strength &&
+            EVIDENCE_STRENGTH_GUIDE[latestInv.conclusion.evidence_strength] && (
+              <Alert
+                type={
+                  latestInv.conclusion.evidence_strength === "multi_path" ? "success" : "info"
+                }
+                showIcon
+                style={{ marginBottom: 12 }}
+                message={`证据强度：${EVIDENCE_STRENGTH_GUIDE[latestInv.conclusion.evidence_strength].label}`}
+                description={
+                  latestInv.conclusion.evidence_strength === "multi_path"
+                    ? "至少两路独立证据交叉验证；仍须人工复核关键数字与回源链接。"
+                    : latestInv.conclusion.evidence_strength === "single_path"
+                      ? "当前为单路孤证，不得单独作为确认攻击依据；建议补时间线/情报/样本路径。"
+                      : "证据不足，优先补充协查信息或扩大调查窗口。"
+                }
+              />
+            )}
+          <Card type="inner" size="small" title="处置分级速查" style={{ marginBottom: 12 }}>
+            <Table
+              size="small"
+              pagination={false}
+              rowKey="key"
+              dataSource={Object.entries(DISPOSITION_GRADE_GUIDE).map(([key, row]) => ({
+                key,
+                ...row,
+              }))}
+              columns={[
+                { title: "分级", dataIndex: "label", width: 110 },
+                { title: "建议动作", dataIndex: "action" },
+                { title: "时限", dataIndex: "sla", width: 100 },
+              ]}
+            />
+          </Card>
           {(latestInv.conclusion.evidence_closure_score != null ||
             latestInv.conclusion.refutation_coverage != null) && (
             <Typography.Paragraph type="secondary">
@@ -248,6 +312,14 @@ export default function EventDetailPage() {
             <Typography.Paragraph>
               <Typography.Text strong>反证摘要：</Typography.Text>
               {latestInv.conclusion.refutation_summary}
+            </Typography.Paragraph>
+          )}
+          {(latestInv.conclusion.evidence_refs?.length ?? 0) > 0 && (
+            <Typography.Paragraph>
+              <Typography.Text strong>证据引用：</Typography.Text>{" "}
+              {latestInv.conclusion.evidence_refs!.map((ref) => (
+                <Tag key={ref}>{ref}</Tag>
+              ))}
             </Typography.Paragraph>
           )}
           <Typography.Paragraph>{latestInv.conclusion.reasoning}</Typography.Paragraph>

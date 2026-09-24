@@ -63,6 +63,9 @@ async def build_investigation_context(
                 alert_category=alert.alert_category,
                 triage_rule_score=triage.rule_score if triage else None,
                 triage_route=triage.route_decision.value if triage else None,
+                dst_ip=str(alert.dst_ip) if alert.dst_ip else None,
+                process_name=alert.process_name,
+                file_hash=alert.file_hash,
             )
         )
 
@@ -107,7 +110,7 @@ async def build_investigation_context(
             runtime_skills=list(p.get("runtime_skills") or []),
             human_questions=list(p.get("human_questions") or []),
         )
-        for p in match_playbooks(event.primary_category, limit=2)
+        for p in match_playbooks(event.primary_category, limit=3)
     ]
 
     return InvestigationContext(

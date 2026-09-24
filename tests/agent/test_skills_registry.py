@@ -8,4 +8,12 @@ from app.skills.submit_conclusion import SUBMIT_CONCLUSION_NAME
 def test_registry_has_mvp_skills() -> None:
     tools = SkillRegistry.tool_definitions(include_submit=True)
     names = {t["function"]["name"] for t in tools}
-    assert {"query_asset", "query_history_alerts", "query_threat_intel", "query_entity_graph", SUBMIT_CONCLUSION_NAME} <= names
+    assert {
+        "query_behavior_timeline",
+        "query_sample_enrichment",
+        "query_asset",
+        "query_history_alerts",
+        "query_threat_intel",
+        "query_entity_graph",
+        SUBMIT_CONCLUSION_NAME,
+    } <= names

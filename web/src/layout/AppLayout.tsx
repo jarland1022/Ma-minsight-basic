@@ -59,7 +59,6 @@ const MODULES: NavModule[] = [
 ];
 
 function matchModule(pathname: string): { module: NavModule; child: NavChild } {
-  // Investigation trace belongs under 事件队列
   if (pathname.startsWith("/investigations/")) {
     const review = MODULES.find((m) => m.key === "review")!;
     const events = review.children.find((c) => c.path === "/events")!;
@@ -91,12 +90,29 @@ export default function AppLayout() {
     queryFn: async () => (await api.get("/auth/me")).data,
   });
 
+  const { data: licenseData } = useQuery({
+    queryKey: ["license-status"],
+    queryFn: async () =>
+      (await api.get("/license/status")).data as {
+        edition?: string;
+        pro_enabled?: boolean;
+        license: { status: string; hint?: string; days_remaining?: number };
+      },
+    refetchInterval: 60_000,
+  });
+  const lic = licenseData?.license;
+  const proEnabled = Boolean(licenseData?.pro_enabled);
+  // Community without Pro license: soft banner. Expired/invalid Pro license: stronger banner.
+  const showLicenseBanner = Boolean(lic && lic.status !== "active");
+  const bannerTone =
+    lic?.status === "community" || lic?.status === "no_license" ? "warn" : "error";
+
   return (
     <div className="ms-shell">
       <header className="ms-header">
         <Link to="/" className="ms-header-brand">
           <span className="ms-header-logo">MA-MinSight</span>
-          <span className="ms-header-model">Community</span>
+          <span className="ms-header-model">{proEnabled ? "Pro" : "Community"}</span>
         </Link>
         <nav className="ms-topnav" aria-label="主模块">
           {MODULES.map((mod) => (
@@ -145,6 +161,17 @@ export default function AppLayout() {
         </aside>
 
         <main className="ms-main">
+          {showLicenseBanner && lic && (
+            <div className={`ms-license-banner ${bannerTone}`} role="status">
+              <span>
+                {lic.hint ||
+                  (lic.status === "community"
+                    ? "社区版：入库/初筛/聚合可用；导入 License 解锁 AI Agent 等专业能力"
+                    : `License 状态：${lic.status}`)}
+              </span>
+              <Link to="/license">License</Link>
+            </div>
+          )}
           <div className="ms-crumb">
             {module.label} / {child.label}
           </div>
