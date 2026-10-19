@@ -42,6 +42,52 @@ body,
   border-radius: 6px;
   padding: 1.4rem 1.5rem 1.25rem;
   box-shadow: 0 8px 28px rgba(8, 58, 102, 0.18);
+  position: relative;
+}
+
+.ms-login-lang {
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.25rem 0 0.5rem;
+}
+
+.ms-lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+}
+
+.ms-lang-btn {
+  background: transparent;
+  border: none;
+  padding: 0.1rem 0.25rem;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.65;
+}
+
+.ms-lang-btn.active {
+  opacity: 1;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.ms-lang-sep {
+  opacity: 0.45;
+}
+
+.ms-header-right .ms-lang-switch {
+  color: #fff;
+  margin-right: 0.15rem;
+}
+
+.ms-header-right .ms-lang-btn {
+  color: #fff;
+}
+
+.ms-login-lang .ms-lang-switch {
+  color: var(--muted);
 }
 
 .ms-brand {

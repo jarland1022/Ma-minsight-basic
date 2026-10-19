@@ -14,6 +14,7 @@ import { isAxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useI18n } from "../i18n/I18nProvider";
 import { api } from "../api/client";
 import EventWorkspace from "../components/EventWorkspace";
 import PageBackHeader from "../components/PageBackHeader";
@@ -23,6 +24,8 @@ import { DISPOSITION_GRADE_GUIDE, EVIDENCE_STRENGTH_GUIDE, PAGE_GUIDES, VERDICT_
 import type { AlertDetailRow, DispositionRow, EventDetail } from "../types/api";
 
 export default function EventDetailPage() {
+  const { t } = useI18n();
+
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -58,7 +61,7 @@ export default function EventDetailPage() {
         request_id: pendingRequest?.id,
       }),
     onSuccess: () => {
-      message.success("协查回复已提交，AI 将自动复跑并更新结论");
+      message.success(t("eventDetail.replyOk"));
       setHrReply("");
       qc.invalidateQueries({ queryKey: ["event", id] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
@@ -70,14 +73,14 @@ export default function EventDetailPage() {
     mutationFn: async (recordId: string) =>
       api.post(`/disposition/${recordId}/confirm`, { confirmed_action: null }),
     onSuccess: () => {
-      message.success("处置已确认");
+      message.success(t("eventDetail.dispositionOk"));
       qc.invalidateQueries({ queryKey: ["event", id] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["noisy-rules"] });
     },
     onError: (error) => {
       const detail = isAxiosError(error) ? error.response?.data?.detail : undefined;
-      message.error(typeof detail === "string" ? detail : "处置确认失败，请稍后重试");
+      message.error(typeof detail === "string" ? detail : t("eventDetail.dispositionFail"));
     },
   });
 
@@ -86,7 +89,7 @@ export default function EventDetailPage() {
   };
 
   if (isLoading || !data) {
-    return <Typography.Text>加载中...</Typography.Text>;
+    return <Typography.Text>{t("eventDetail.loading")}</Typography.Text>;
   }
 
   const latestInv = data.investigations?.[0];
@@ -97,14 +100,14 @@ export default function EventDetailPage() {
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <PageBackHeader to="/events" label="返回事件队列" />
+      <PageBackHeader to="/events" label={t("eventDetail.back")} />
 
       {(data.status === "human_pending" || pendingRequest) && (
         <Alert
           type="warning"
           showIcon
-          message="此事件需要您补充信息"
-          description="请在下方「Web 协查回复」或左侧「人工协查」用白话说明业务背景，无需判断是否为攻击。提交后 AI 会自动再次分析。"
+          message={t("eventDetail.needInfoTitle")}
+          description={t("eventDetail.needInfoBody")}
         />
       )}
 
@@ -119,24 +122,24 @@ export default function EventDetailPage() {
 
       <Card title={data.title || data.id}>
         <Descriptions column={2}>
-          <Descriptions.Item label="状态">
+          <Descriptions.Item label={t("eventDetail.status")}>
             <Tag color={data.status === "human_pending" ? "orange" : undefined}>
               {eventStatusLabel(data.status)}
             </Tag>
           </Descriptions.Item>
-          <Descriptions.Item label="风险">{data.risk_score}</Descriptions.Item>
-          <Descriptions.Item label="主机">{data.aggregate_host_name}</Descriptions.Item>
-          <Descriptions.Item label="用户">{data.aggregate_user_name}</Descriptions.Item>
-          <Descriptions.Item label="类别">{data.primary_category || data.aggregate_category}</Descriptions.Item>
+          <Descriptions.Item label={t("eventDetail.risk")}>{data.risk_score}</Descriptions.Item>
+          <Descriptions.Item label={t("eventDetail.host")}>{data.aggregate_host_name}</Descriptions.Item>
+          <Descriptions.Item label={t("eventDetail.user")}>{data.aggregate_user_name}</Descriptions.Item>
+          <Descriptions.Item label={t("eventDetail.category")}>{data.primary_category || data.aggregate_category}</Descriptions.Item>
           {(data.status === "concluded" || data.status === "closed") && latestInv?.finished_at && (
-            <Descriptions.Item label="结论时间">
+            <Descriptions.Item label={t("eventDetail.concludedAt")}>
               {latestInv.finished_at.slice(0, 19).replace("T", " ")}
             </Descriptions.Item>
           )}
         </Descriptions>
       </Card>
 
-      <Card title="关联告警（初筛路由 ≠ Agent 结论）">
+      <Card title={t("eventDetail.relatedAlerts")}>
         <Table<AlertDetailRow>
           rowKey="alert_id"
           pagination={false}
@@ -148,7 +151,7 @@ export default function EventDetailPage() {
           })}
           columns={[
             {
-              title: "规则",
+              title: t("eventDetail.colRule"),
               dataIndex: "rule_name",
               render: (v, row) => (
                 <Typography.Link
@@ -161,12 +164,12 @@ export default function EventDetailPage() {
                 </Typography.Link>
               ),
             },
-            { title: "初筛路由", dataIndex: "triage_route", render: (v) => <Tag>{v}</Tag> },
-            { title: "初筛分", dataIndex: "triage_score" },
-            { title: "严重度", dataIndex: "severity" },
-            { title: "源 IP", dataIndex: "src_ip" },
+            { title: t("eventDetail.colTriageRoute"), dataIndex: "triage_route", render: (v) => <Tag>{v}</Tag> },
+            { title: t("eventDetail.colTriageScore"), dataIndex: "triage_score" },
+            { title: t("eventDetail.colSeverity"), dataIndex: "severity" },
+            { title: t("eventDetail.colSrcIp"), dataIndex: "src_ip" },
             {
-              title: "归属地",
+              title: t("eventDetail.colGeo"),
               dataIndex: "src_geo",
               render: (value: string | null | undefined) => value || "-",
             },
@@ -177,7 +180,7 @@ export default function EventDetailPage() {
           <Card
             id={`alert-${selectedAlert.alert_id}`}
             size="small"
-            title="告警详情"
+            title={t("eventDetail.alertDetail")}
             style={{ marginTop: 16 }}
             extra={
               <Button type="link" onClick={() => navigate({ pathname: `/events/${id}` }, { replace: true })}>
@@ -197,8 +200,8 @@ export default function EventDetailPage() {
                   : "-"}
               </Descriptions.Item>
               <Descriptions.Item label="归属地">{selectedAlert.src_geo || "-"}</Descriptions.Item>
-              <Descriptions.Item label="主机">{selectedAlert.host_name || "-"}</Descriptions.Item>
-              <Descriptions.Item label="用户">{selectedAlert.user_name || "-"}</Descriptions.Item>
+              <Descriptions.Item label={t("eventDetail.host")}>{selectedAlert.host_name || "-"}</Descriptions.Item>
+              <Descriptions.Item label={t("eventDetail.user")}>{selectedAlert.user_name || "-"}</Descriptions.Item>
               <Descriptions.Item label="进程">{selectedAlert.process_name || "-"}</Descriptions.Item>
               <Descriptions.Item label="文件哈希" span={2}>
                 {selectedAlert.file_hash || "-"}
@@ -214,7 +217,7 @@ export default function EventDetailPage() {
       </Card>
 
       {latestInv?.conclusion && (
-        <Card title="Agent 复核结论">
+        <Card title={t("eventDetail.agentConclusion")}>
           <Typography.Paragraph>
             <VerdictTag verdict={latestInv.conclusion.verdict} /> 置信度{" "}
             {latestInv.conclusion.confidence}
@@ -282,7 +285,7 @@ export default function EventDetailPage() {
                 }
               />
             )}
-          <Card type="inner" size="small" title="处置分级速查" style={{ marginBottom: 12 }}>
+          <Card type="inner" size="small" title={t("eventDetail.gradeQuick")} style={{ marginBottom: 12 }}>
             <Table
               size="small"
               pagination={false}
@@ -292,8 +295,8 @@ export default function EventDetailPage() {
                 ...row,
               }))}
               columns={[
-                { title: "分级", dataIndex: "label", width: 110 },
-                { title: "建议动作", dataIndex: "action" },
+                { title: t("eventDetail.colGrade"), dataIndex: "label", width: 110 },
+                { title: t("eventDetail.colAction"), dataIndex: "action" },
                 { title: "时限", dataIndex: "sla", width: 100 },
               ]}
             />
@@ -381,7 +384,7 @@ export default function EventDetailPage() {
       )}
 
       {pendingRequest && (
-        <Card title="Web 协查回复">
+        <Card title={t("eventDetail.webReply")}>
           <Alert
             type="success"
             showIcon

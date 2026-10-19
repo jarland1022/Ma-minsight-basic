@@ -4,8 +4,10 @@ import { api } from "../api/client";
 import IngestionDiagnosticsPanel from "../components/IngestionDiagnosticsPanel";
 import ManualRunPanel from "../components/ManualRunPanel";
 import type { ConfigRow } from "../types/api";
+import { useI18n } from "../i18n/I18nProvider";
 
 export default function SettingsPage() {
+  const { t } = useI18n();
   const qc = useQueryClient();
   const { data: configs, isLoading } = useQuery<ConfigRow[]>({
     queryKey: ["config"],
@@ -21,25 +23,23 @@ export default function SettingsPage() {
     mutationFn: (row: { key: string; value: unknown }) =>
       api.put(`/system/config/${row.key}`, { value: row.value }),
     onSuccess: () => {
-      message.success("配置已更新");
+      message.success(t("settings.configUpdated"));
       qc.invalidateQueries({ queryKey: ["config"] });
     },
   });
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <Card title="告警入库故障排查">
+      <Card title={t("settings.ingestDiag")}>
         <IngestionDiagnosticsPanel />
       </Card>
 
-      <Card title="手动运行流水线（管理员）">
+      <Card title={t("settings.manualRun")}>
         <ManualRunPanel />
       </Card>
 
-      <Card title="调查 SOP 模板（只读）">
-        <Typography.Paragraph type="secondary">
-          结构化假设模板与推荐 Skill，供运维核对 Agent 调查策略。
-        </Typography.Paragraph>
+      <Card title={t("settings.sopTitle")}>
+        <Typography.Paragraph type="secondary">{t("settings.sopHint")}</Typography.Paragraph>
         {(sops?.items ?? []).map(
           (sop: {
             id: string;
@@ -55,44 +55,50 @@ export default function SettingsPage() {
               title={`${sop.alert_category} · ${sop.name}`}
             >
               <Typography.Text type="secondary">
-                推荐 Skill：{(sop.recommended_skills ?? []).join(", ") || "—"}
+                {t("settings.recommendedSkills", {
+                  skills: (sop.recommended_skills ?? []).join(", ") || "—",
+                })}
               </Typography.Text>
               {sop.hypothesis_template ? (
                 <pre style={{ whiteSpace: "pre-wrap", marginTop: 8, fontSize: 12 }}>
                   {JSON.stringify(sop.hypothesis_template, null, 2)}
                 </pre>
               ) : (
-                <Typography.Text type="secondary">无 hypothesis_template</Typography.Text>
+                <Typography.Text type="secondary">{t("settings.noHypothesis")}</Typography.Text>
               )}
             </Card>
           ),
         )}
       </Card>
 
-      <Card title="系统配置">
+      <Card title={t("settings.systemConfig")}>
         <Table<ConfigRow>
           loading={isLoading}
           rowKey="key"
           dataSource={configs ?? []}
           pagination={{ pageSize: 20 }}
           columns={[
-            { title: "配置项", dataIndex: "key", width: 280 },
+            { title: t("settings.colKey"), dataIndex: "key", width: 280 },
             {
-              title: "值",
+              title: t("settings.colValue"),
               dataIndex: "value",
               render: (v) => <Typography.Text code>{JSON.stringify(v)}</Typography.Text>,
             },
-            { title: "说明", dataIndex: "description", ellipsis: true },
+            { title: t("settings.colDesc"), dataIndex: "description", ellipsis: true },
           ]}
           expandable={{
             expandedRowRender: (row) => (
-              <Typography.Paragraph editable={{ onChange: (text) => {
-                try {
-                  updateConfig.mutate({ key: row.key, value: JSON.parse(text) });
-                } catch {
-                  message.error("JSON 格式无效");
-                }
-              } }}>
+              <Typography.Paragraph
+                editable={{
+                  onChange: (text) => {
+                    try {
+                      updateConfig.mutate({ key: row.key, value: JSON.parse(text) });
+                    } catch {
+                      message.error(t("settings.invalidJson"));
+                    }
+                  },
+                }}
+              >
                 {JSON.stringify(row.value, null, 2)}
               </Typography.Paragraph>
             ),

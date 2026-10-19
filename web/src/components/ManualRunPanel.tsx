@@ -11,11 +11,14 @@ import {
 } from "@ant-design/icons";
 import { Alert, Button, Card, Col, Row, Space, Steps, Tag, Typography, message } from "antd";
 import type { ReactNode } from "react";
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, formatApiError } from "../api/client";
+import { useI18n } from "../i18n/I18nProvider";
 
 type PipelineGroup = "main" | "eval";
+type Translate = (path: string, vars?: Record<string, string | number>) => string;
 
 export type ManualPipelineDef = {
   key: string;
@@ -30,116 +33,98 @@ export type ManualPipelineDef = {
   color: string;
 };
 
-export const MANUAL_PIPELINES: ManualPipelineDef[] = [
+const PIPELINE_META: {
+  key: string;
+  group: PipelineGroup;
+  icon: ReactNode;
+  color: string;
+  link?: string;
+}[] = [
   {
     key: "ingestion",
-    label: "告警入库",
-    summary: "从 Wazuh Indexer 拉取新告警",
-    detail: "读取已启用数据源的上次游标，增量同步告警到 alerts 表。",
-    effect: "NEW 告警数量上升；入库流水线时间更新",
-    where: "运营概览 → 初筛告警（NEW）",
-    link: "/",
     group: "main",
     icon: <CloudDownloadOutlined />,
     color: "#1677ff",
+    link: "/",
   },
   {
     key: "triage",
-    label: "初筛分诊",
-    summary: "对 NEW 告警打分并决定路由",
-    detail: "规则分、画像提示、白名单等；结果写入 triage_results，告警变为 TRIAGED 或 ARCHIVED。",
-    effect: "NEW 减少；待聚合告警产生",
-    where: "运营概览 → 告警状态分布",
-    link: "/",
     group: "main",
     icon: <FilterOutlined />,
     color: "#13c2c2",
+    link: "/",
   },
   {
     key: "aggregation",
-    label: "事件聚合",
-    summary: "把告警合并为调查 Event",
-    detail: "按主机+用户+类别+24h 窗口合并，生成或更新 events 记录。",
-    effect: "「待调查 Event」数量增加",
-    where: "事件列表（状态：待调查）",
-    link: "/events",
     group: "main",
     icon: <MergeCellsOutlined />,
     color: "#722ed1",
+    link: "/events",
   },
   {
     key: "investigation",
-    label: "Agent 调查 (Pro)",
-    summary: "AI 深度调查待审 Event（需专业版 License）",
-    detail: "调用 LLM + Skill，输出结构化结论。社区版点击将返回 402。",
-    effect: "事件详情出现 ReAct 记录",
-    where: "事件详情 → ReAct 对话流",
-    link: "/license",
     group: "main",
     icon: <RobotOutlined />,
     color: "#eb2f96",
+    link: "/license",
   },
   {
     key: "human_review",
-    label: "协查派发 (Pro)",
-    summary: "向 IM 发送人工协查问题（需专业版）",
-    detail: "企微推送或 Web 协查 inbox。",
-    effect: "人工协查页出现待回复请求",
-    where: "协查管理",
-    link: "/license",
     group: "main",
     icon: <MessageOutlined />,
     color: "#fa8c16",
+    link: "/license",
   },
   {
     key: "defense_assets",
-    label: "防御资产沉淀 (Pro)",
-    summary: "已结论事件写入判例与建议（需专业版）",
-    detail: "生成判例、白名单候选、处置建议等。",
-    effect: "防御资产页出现待确认项",
-    where: "防御资产",
-    link: "/license",
     group: "main",
     icon: <SafetyOutlined />,
     color: "#52c41a",
+    link: "/license",
   },
   {
     key: "regression",
-    label: "回归测试 (Pro)",
-    summary: "用内置样本校验 Agent 行为（需专业版）",
-    detail: "不参与日常告警处理。",
-    effect: "评测页显示最新回归通过率",
-    where: "评测",
-    link: "/license",
     group: "eval",
     icon: <ExperimentOutlined />,
     color: "#597ef7",
+    link: "/license",
   },
   {
     key: "health_check",
-    label: "链路探针 (Pro)",
-    summary: "端到端自检（需专业版）",
-    detail: "模拟探针告警跑通整条链路。",
-    effect: "评测页显示 PASS / FAIL",
-    where: "评测",
-    link: "/license",
     group: "eval",
     icon: <HeartOutlined />,
     color: "#f5222d",
+    link: "/license",
   },
 ];
-const MAIN_FLOW_KEYS = MANUAL_PIPELINES.filter((p) => p.group === "main").map((p) => p.key);
 
-function formatRunResult(key: string, result: Record<string, unknown> | undefined): string {
-  if (!result) return "已提交";
+export function buildPipelines(t: Translate): ManualPipelineDef[] {
+  return PIPELINE_META.map((meta) => ({
+    ...meta,
+    label: t(`pipelines.${meta.key}`),
+    summary: t(`manual.${meta.key}Summary`),
+    detail: t(`manual.${meta.key}Detail`),
+    effect: t(`manual.${meta.key}Effect`),
+    where: t(`manual.${meta.key}Where`),
+  }));
+}
+
+const MAIN_FLOW_KEYS = PIPELINE_META.filter((p) => p.group === "main").map((p) => p.key);
+
+function formatRunResult(
+  t: Translate,
+  key: string,
+  result: Record<string, unknown> | undefined,
+): string {
+  if (!result) return t("manual.submitted");
   const errors = result.errors;
   if (Array.isArray(errors) && errors.length > 0) {
     return errors.map(String).join("；");
   }
-  if (result.skipped_lock) return "调度锁占用，本轮未执行（约 2–5 分钟后重试）";
-  if (result.skipped_budget) return "今日调查预算已用完";
-  if (result.skipped_not_configured) return "协查通道未配置，已跳过";
-  if (result.skipped_disabled) return "功能已关闭（见系统配置）";
+  if (result.skipped_lock) return t("manual.lockBusy");
+  if (result.skipped_budget) return t("manual.budgetDone");
+  if (result.skipped_not_configured) return t("manual.notConfigured");
+  if (result.skipped_disabled) return t("manual.disabled");
 
   switch (key) {
     case "ingestion": {
@@ -147,37 +132,40 @@ function formatRunResult(key: string, result: Record<string, unknown> | undefine
       const dup = Number(result.duplicates ?? 0);
       const fetched = Number(result.fetched ?? 0);
       if (fetched === 0 && inserted === 0) {
-        return "拉取 0 条（暂无新告警或回溯窗口内无数据，请查看下方「告警入库故障排查」）";
+        return t("manual.ingestZero");
       }
-      return `拉取 ${fetched} 条，新增 ${inserted} 条，重复 ${dup} 条`;
+      return t("manual.ingestResult", { fetched, inserted, dup });
     }
     case "triage":
-      return `处理 ${result.processed ?? 0} 条`;
+      return t("manual.processed", { n: Number(result.processed ?? 0) });
     case "aggregation":
-      return `处理 ${result.processed ?? 0} 条，新建 Event ${result.events_created ?? 0}，合并 ${result.events_merged ?? 0}`;
+      return t("manual.aggResult", {
+        n: Number(result.processed ?? 0),
+        created: Number(result.events_created ?? 0),
+        merged: Number(result.events_merged ?? 0),
+      });
     case "investigation":
-      return `调查 ${result.processed ?? 0} 个 Event`;
-    case "human_review": {
-      const cancelled = Number(result.cancelled_obsolete ?? 0);
-      const parts = [`下发 ${result.dispatched ?? 0} 条`, `过期 ${result.expired ?? 0} 条`];
-      if (cancelled > 0) {
-        parts.push(`清理旧单 ${cancelled} 条`);
-      }
-      return parts.join("，");
-    }
+      return t("manual.invResult", { n: Number(result.processed ?? 0) });
+    case "human_review":
+      return t("manual.hrResult", {
+        d: Number(result.dispatched ?? 0),
+        e: Number(result.expired ?? 0),
+      });
     case "defense_assets":
-      return `沉淀 ${result.processed ?? 0} 个 Event`;
+      return t("manual.defResult", { n: Number(result.processed ?? 0) });
     case "regression":
-      return `通过 ${result.passed ?? 0}/${result.total ?? 0}`;
     case "health_check":
-      return `通过 ${result.passed ?? 0}/${result.total ?? 0}`;
+      return t("manual.passResult", {
+        passed: Number(result.passed ?? 0),
+        total: Number(result.total ?? 0),
+      });
     default:
-      return "已完成";
+      return t("manual.done");
   }
 }
 
-function formatLastRun(iso: string | null | undefined): string {
-  if (!iso) return "从未运行";
+function formatLastRun(t: Translate, iso: string | null | undefined): string {
+  if (!iso) return t("manual.never");
   return iso.slice(0, 19).replace("T", " ");
 }
 
@@ -187,12 +175,14 @@ function PipelineCard({
   loading,
   disabled,
   onRun,
+  t,
 }: {
   pipeline: ManualPipelineDef;
   lastRun?: string | null;
   loading: boolean;
   disabled?: boolean;
   onRun: () => void;
+  t: Translate;
 }) {
   return (
     <Card
@@ -233,18 +223,18 @@ function PipelineCard({
       <Space direction="vertical" size={4} style={{ width: "100%", marginBottom: 12 }}>
         <Typography.Text style={{ fontSize: 12 }}>
           <Tag color="blue" bordered={false}>
-            预期效果
+            {t("manual.expected")}
           </Tag>
           {pipeline.effect}
         </Typography.Text>
         <Typography.Text style={{ fontSize: 12 }}>
           <Tag color="green" bordered={false}>
-            查看位置
+            {t("manual.where")}
           </Tag>
           {pipeline.link ? <Link to={pipeline.link}>{pipeline.where}</Link> : pipeline.where}
         </Typography.Text>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          最近运行：{formatLastRun(lastRun)}
+          {t("manual.lastRun", { time: formatLastRun(t, lastRun) })}
         </Typography.Text>
       </Space>
 
@@ -257,14 +247,17 @@ function PipelineCard({
         disabled={disabled}
         onClick={onRun}
       >
-        立即运行
+        {t("manual.runNow")}
       </Button>
     </Card>
   );
 }
 
 export default function ManualRunPanel() {
+  const { t } = useI18n();
   const qc = useQueryClient();
+  const pipelines = useMemo(() => buildPipelines(t), [t]);
+
   const { data: me } = useQuery({
     queryKey: ["auth-me"],
     queryFn: async () => (await api.get("/auth/me")).data,
@@ -288,8 +281,8 @@ export default function ManualRunPanel() {
       return { key, ...res.data };
     },
     onSuccess: ({ key, result }) => {
-      const def = MANUAL_PIPELINES.find((p) => p.key === key);
-      const summary = formatRunResult(key, result);
+      const def = pipelines.find((p) => p.key === key);
+      const summary = formatRunResult(t, key, result);
       const hasErrors = Array.isArray(result?.errors) && result.errors.length > 0;
       if (hasErrors) {
         message.error(`${def?.label ?? key}：${summary}`);
@@ -306,8 +299,8 @@ export default function ManualRunPanel() {
     onError: (error) => message.error(formatApiError(error)),
   });
 
-  const mainPipelines = MANUAL_PIPELINES.filter((p) => p.group === "main");
-  const evalPipelines = MANUAL_PIPELINES.filter((p) => p.group === "eval");
+  const mainPipelines = pipelines.filter((p) => p.group === "main");
+  const evalPipelines = pipelines.filter((p) => p.group === "eval");
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="middle">
@@ -315,25 +308,19 @@ export default function ManualRunPanel() {
         <Alert
           type="warning"
           showIcon
-          message="当前账号无管理员权限"
-          description="手动运行流水线需要管理员账号（默认 admin）。请退出后使用管理员重新登录。"
+          message={t("manual.needAdmin")}
+          description={t("manual.needAdminBody")}
         />
       )}
 
       <Alert
         type="info"
         showIcon
-        message="手动运行说明"
-        description={
-          <>
-            系统每 2–5 分钟会自动调度各阶段；此处用于<strong>立即补跑一轮</strong>（默认每轮最多 10
-            条）。日常处理请按下方箭头顺序依次执行；若某步显示「处理 0 条」，通常是上一步尚无可用数据。
-            详细数字也会出现在浏览器开发者工具 Network 的响应中。
-          </>
-        }
+        message={t("manual.helpTitle")}
+        description={t("manual.helpBody")}
       />
 
-      <Card title="日常告警处理流程" size="small">
+      <Card title={t("manual.mainFlow")} size="small">
         <Steps
           size="small"
           direction="horizontal"
@@ -346,13 +333,13 @@ export default function ManualRunPanel() {
           style={{ overflowX: "auto", paddingBottom: 8 }}
         />
         <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0, fontSize: 12 }}>
-          推荐顺序：{MAIN_FLOW_KEYS.map((k) => MANUAL_PIPELINES.find((p) => p.key === k)?.label).join(" → ")}
+          {MAIN_FLOW_KEYS.map((k) => pipelines.find((p) => p.key === k)?.label).join(" → ")}
         </Typography.Paragraph>
       </Card>
 
       <div>
         <Typography.Title level={5} style={{ marginBottom: 12 }}>
-          日常流水线
+          {t("manual.mainFlow")}
         </Typography.Title>
         <Row gutter={[16, 16]}>
           {mainPipelines.map((p) => (
@@ -363,6 +350,7 @@ export default function ManualRunPanel() {
                 loading={runPipeline.isPending && runPipeline.variables === p.key}
                 disabled={!isAdmin}
                 onRun={() => runPipeline.mutate(p.key)}
+                t={t}
               />
             </Col>
           ))}
@@ -371,7 +359,7 @@ export default function ManualRunPanel() {
 
       <div>
         <Typography.Title level={5} style={{ marginBottom: 12 }}>
-          运维自检（不影响真实告警）
+          {t("manual.evalFlow")}
         </Typography.Title>
         <Row gutter={[16, 16]}>
           {evalPipelines.map((p) => (
@@ -386,6 +374,7 @@ export default function ManualRunPanel() {
                 loading={runPipeline.isPending && runPipeline.variables === p.key}
                 disabled={!isAdmin}
                 onRun={() => runPipeline.mutate(p.key)}
+                t={t}
               />
             </Col>
           ))}

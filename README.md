@@ -1,58 +1,63 @@
-# MA-MinSight Community
+﻿# MA-MinSight Community
 
-自托管的 **SIEM 告警分诊控制台（开源社区版）**。对接 Wazuh（或同类）告警后，完成：
+**English** | [中文](README.zh-CN.md)
 
-**入库 → 规则初筛 → 事件聚合 → 控制台查看**（含技能库 / ATT&CK 覆盖视图）
+Self-hosted **SIEM alert triage console** (open-source Community Edition). Connect Wazuh (or similar) alerts and run:
 
-专业版（AI Agent 深度研判、企微人工协查、防御资产闭环、评测与商用支持）**通过 License 解锁**，不在「免费默认可跑」范围。联系：微信 `jarlandliu`，邮箱 `jarland@mingansec.com`。对照：[`docs/community-vs-pro.md`](docs/community-vs-pro.md)。
+**Ingest → rule triage → event aggregation → console** (playbooks / ATT&CK coverage included)
+
+**Professional** (AI agent investigation, WeCom human review, defense-asset loop, eval suite, commercial support) unlocks with a **License** — not enabled by default. Contact: WeChat `jarlandliu` · email `jarland@mingansec.com`. Compare editions: [`docs/community-vs-pro.md`](docs/community-vs-pro.md) · [中文对照](docs/community-vs-pro.zh-CN.md).
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+[![Edition](https://img.shields.io/badge/Community-open%20source-brightgreen)](docs/community-vs-pro.md)
 
-仓库：
-- GitHub：https://github.com/jarland1022/Ma-minsight-basic
-- Gitee：https://gitee.com/jarland/Ma-minsight-basic
+Repositories:
+- GitHub: https://github.com/jarland1022/Ma-minsight-basic
+- Gitee: https://gitee.com/jarland/Ma-minsight-basic
 
-## 社区版能做什么
+## What Community includes
 
-| 能力 | 说明 |
-|------|------|
-| 自己安装 | Docker Compose / 本地 Python + Vite |
-| 告警入库 | Wazuh Indexer / Mock 数据源 |
-| 规则初筛 | 降噪、白名单、路由到归档或待聚合；仪表盘噪声规则视图 |
-| 事件聚合 | 主机+用户+类别+时间窗 → Event |
-| 技能库 | 精选 Playbooks + 社区扩展包；ATT&CK 覆盖看板 |
-| 控制台 | 仪表盘、事件队列、使用指南、License |
-| License | 仓库已含验签公钥；导入 `license.lic` 后重启即可升专业版 |
+| Capability | Notes |
+|------------|--------|
+| Install | Docker Compose / local Python + Vite |
+| Alert ingest | Wazuh Indexer / Mock sources |
+| Rule triage | Noise reduction, allowlists, archive or escalate; noisy-rules on the dashboard |
+| Event aggregation | Host + user + category + time window → Event |
+| Playbooks | Curated catalog + community pack; ATT&CK coverage board |
+| Console | Dashboard, event queue, user guide, License page (**English default**, switch to 中文) |
+| License | Public verify key ships in-repo; import `license.lic` and restart to unlock Pro |
 
-**不含（需专业版 License）：** LLM ReAct Agent、企微协查、防御资产学习、回归/探针评测、厂商驻场与合同交付。
+**Not included (requires Pro License):** LLM ReAct agent, WeCom human review, defense-asset learning, regression / health-check eval, on-site commercial delivery.
 
-## 快速开始
+## Quick start
 
-需要 Docker（推荐）或 Python ≥3.11 + Node 18+、PostgreSQL、Redis。
+Requires Docker (recommended), or Python ≥3.11 + Node 18+ with PostgreSQL and Redis.
 
 ```bash
 git clone https://github.com/jarland1022/Ma-minsight-basic.git
-# 国内：git clone https://gitee.com/jarland/Ma-minsight-basic.git
+# China mirror: git clone https://gitee.com/jarland/Ma-minsight-basic.git
 cd Ma-minsight-basic
 
 cp .env.example .env
-# 编辑 POSTGRES_PASSWORD、API_KEY、JWT_SECRET 等
+# Set POSTGRES_PASSWORD, API_KEY, JWT_SECRET, etc.
 
 docker compose up -d --build
 ```
 
-| 地址 | 作用 |
-|------|------|
-| http://127.0.0.1/ （或 `.env` 中 `HTTP_PORT`） | 控制台（nginx） |
-| 容器内 `/health` | 应返回 `edition=community` |
+| URL | Purpose |
+|-----|---------|
+| http://127.0.0.1/ (or `HTTP_PORT` in `.env`) | Web console (nginx) |
+| App `/health` | Should report `edition=community` |
 
-默认管理员见 `.env` 的 `ADMIN_INITIAL_PASSWORD`（示例为 `changeme`）。登录后建议：
+Default admin password comes from `ADMIN_INITIAL_PASSWORD` in `.env` (example: `changeme`). After login:
 
-1. **设置 → 手动运行流水线**：入库 → 初筛 → 聚合  
-2. **事件队列** 确认已生成 Event  
-3. **技能库** 浏览 Playbooks / ATT&CK 覆盖  
+1. **Settings → Run pipelines manually**: ingest → triage → aggregate  
+2. Open **Events** and confirm Event rows appear  
+3. Browse **Playbooks** / ATT&CK coverage  
 
-### 本地开发（可选）
+The console defaults to **English**. Use **EN | 中文** on the login page or header to switch; the choice is stored in the browser. See [`docs/i18n.md`](docs/i18n.md).
+
+### Local development (optional)
 
 ```bash
 python -m venv .venv
@@ -64,35 +69,40 @@ uvicorn app.main:app --reload --port 8000
 cd web && npm install && npm run dev
 ```
 
-## 升级到专业版
+## Upgrade to Professional
 
-1. 控制台 **系统 → License**，复制机器指纹。  
-2. 联系厂商获取 `license.lic`（公钥 `ma-minsight-public.pem` 已在仓库 `configs/license/`）。  
-3. 在页面导入 `.lic`，或放到 `configs/license/license.lic`，**重启应用**。  
-4. 解锁后：Agent 调查、人工协查、防御资产、评测可用（含结论处置分级等新能力）。
+1. Open **System → License** and copy the machine fingerprint.  
+2. Obtain `license.lic` from the vendor (`ma-minsight-public.pem` is already under `configs/license/`).  
+3. Import the `.lic` in the UI (or place it at `configs/license/license.lic`) and **restart the app**.  
+4. Unlocks: AI agent, human review, defense assets, eval (including disposition grading).
 
-社区版**没有**自动 72 小时 Pro 试用；试用授权由厂商按指纹签发。
+Community has **no** silent 72-hour Pro trial; trial licenses are issued by fingerprint.
 
-## 目录
+## Layout
 
 ```text
-app/                 # FastAPI 后端（社区能力常开；Pro API 需 License）
-web/                 # React 控制台
-alembic/             # 数据库迁移（含结论处置分级 018）
+app/                 # FastAPI (Community always on; Pro APIs need License)
+web/                 # React console (EN default, ZH switch)
+alembic/             # DB migrations (incl. disposition grade 018)
 app/playbooks/       # catalog + community_pack + ATT&CK
-configs/license/     # 公钥（勿提交私钥 / license.lic）
+configs/license/     # public key (never commit private keys / license.lic)
 deploy/              # Docker / nginx
-docs/                # 文档与介绍文章
+docs/                # docs & articles
 EDITION              # community
 LICENSE / NOTICE     # Apache-2.0
 ```
 
-## 相关文档
+## Docs
 
-- [`docs/community-vs-pro.md`](docs/community-vs-pro.md) — 能力与定价对照  
-- [`docs/article-siem-minsight.md`](docs/article-siem-minsight.md) — 可发布介绍文  
-- [Ma-WAF Community](https://github.com/jarland1022/Ma-waf-basic) — 开源 WAF 社区版  
+- [`docs/community-vs-pro.md`](docs/community-vs-pro.md) — Community vs Pro (English)  
+- [`docs/community-vs-pro.zh-CN.md`](docs/community-vs-pro.zh-CN.md) — 中文对照  
+- [`docs/i18n.md`](docs/i18n.md) — Console language (EN default / 中文)  
+- [`docs/article-siem-minsight.md`](docs/article-siem-minsight.md) — Chinese launch article  
+- [`docs/video-prompts-xiaohongshu-douyin.md`](docs/video-prompts-xiaohongshu-douyin.md) — CN/EN short-video prompts  
+- [`docs/marketing/overseas/`](docs/marketing/overseas/) — **LinkedIn / Upwork / overseas GTM** (same pattern as Ma-WAF)  
+- [`docs/marketing/landing.html`](docs/marketing/landing.html) · [`docs/marketing/GITHUB_PAGES.md`](docs/marketing/GITHUB_PAGES.md) — **English landing → GitHub Pages**  
+- [Ma-WAF Community](https://github.com/jarland1022/Ma-waf-basic) — open-source WAF  
 
-## 许可
+## License
 
-Apache License 2.0。详见 [LICENSE](LICENSE) 与 [NOTICE](NOTICE)。
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

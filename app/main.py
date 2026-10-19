@@ -91,7 +91,8 @@ _edition_label = "Community" if is_community_edition() else "Professional"
 app = FastAPI(
     title=f"MA-MinSight {_edition_label}",
     description=(
-        "SIEM alert triage console. Community: ingest → triage → aggregate → events. "
+        "SIEM alert triage console (English UI by default; switch to 中文 in the web console). "
+        "Community: ingest → triage → aggregate → events. "
         "Professional (license): AI Agent, WeCom review, defense assets, eval."
     ),
     version="0.1.0",

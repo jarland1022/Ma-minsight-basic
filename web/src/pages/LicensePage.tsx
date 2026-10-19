@@ -1,6 +1,7 @@
 import { Alert, Button, Card, Space, Typography, Upload, message } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, formatApiError } from "../api/client";
+import { useI18n } from "../i18n/I18nProvider";
 
 type LicenseStatusResponse = {
   edition?: string;
@@ -22,6 +23,7 @@ type FingerprintResponse = {
 };
 
 export default function LicensePage() {
+  const { t } = useI18n();
   const qc = useQueryClient();
   const { data, isLoading, isError, error } = useQuery<LicenseStatusResponse>({
     queryKey: ["license-status"],
@@ -39,7 +41,7 @@ export default function LicensePage() {
       return (await api.post("/license/import", form)).data;
     },
     onSuccess: () => {
-      message.success("License 已导入；请重启应用以加载专业版调度器");
+      message.success(t("license.importOk"));
       qc.invalidateQueries({ queryKey: ["license-status"] });
     },
     onError: (err) => message.error(formatApiError(err)),
@@ -53,52 +55,55 @@ export default function LicensePage() {
       <Alert
         type={pro ? "success" : "info"}
         showIcon
-        message={pro ? "专业版已激活" : "当前为社区版能力"}
-        description={
-          pro
-            ? "AI Agent、企微协查、防御资产与评测已解锁。"
-            : "社区版可免费使用：告警入库 → 初筛 → 聚合 → 事件台与技能库。导入专业版 License 后解锁 AI 深度研判等能力。"
-        }
+        message={pro ? t("license.proActive") : t("license.communityMode")}
+        description={pro ? t("license.proUnlocked") : t("license.communityHint")}
       />
 
-      <Card title="License 状态" loading={isLoading}>
+      <Card title={t("license.titleStatus")} loading={isLoading}>
         {isError ? (
           <Typography.Text type="danger">{formatApiError(error)}</Typography.Text>
         ) : (
           <>
             <Typography.Paragraph>
-              发行版：<Typography.Text code>{data?.edition ?? "community"}</Typography.Text>
+              {t("license.edition")}：
+              <Typography.Text code>{data?.edition ?? "community"}</Typography.Text>
               {" · "}
-              状态：<Typography.Text code>{lic?.status ?? "—"}</Typography.Text>
+              {t("license.status")}：
+              <Typography.Text code>{lic?.status ?? "—"}</Typography.Text>
             </Typography.Paragraph>
             {lic?.client_name && (
-              <Typography.Paragraph>客户：{lic.client_name}</Typography.Paragraph>
+              <Typography.Paragraph>
+                {t("license.client")}：{lic.client_name}
+              </Typography.Paragraph>
             )}
             {lic?.expiry_date && (
               <Typography.Paragraph>
-                到期：{lic.expiry_date}
-                {typeof lic.days_remaining === "number" ? `（剩余 ${lic.days_remaining} 天）` : ""}
+                {t("license.expiry")}：{lic.expiry_date}
+                {typeof lic.days_remaining === "number"
+                  ? t("license.daysLeft", { days: lic.days_remaining })
+                  : ""}
               </Typography.Paragraph>
             )}
-            {lic?.hint && <Typography.Paragraph type="secondary">{lic.hint}</Typography.Paragraph>}
+            <Typography.Paragraph type="secondary">
+              {lic?.status === "community"
+                ? t("license.communityHint")
+                : lic?.hint || t("license.bannerStatus", { status: lic?.status ?? "—" })}
+            </Typography.Paragraph>
           </>
         )}
       </Card>
 
-      <Card title="机器指纹（购买专业版时发给厂商）">
+      <Card title={t("license.titleFingerprint")}>
         <Typography.Paragraph copyable={fp?.fingerprint ? { text: fp.fingerprint } : false}>
-          {fp?.fingerprint ?? "加载中…"}
+          {fp?.fingerprint ?? t("license.loading")}
         </Typography.Paragraph>
-        <Typography.Text type="secondary">{fp?.hint}</Typography.Text>
+        <Typography.Text type="secondary">
+          {t("license.importHint")}
+        </Typography.Text>
       </Card>
 
-      <Card title="导入专业版 License">
-        <Typography.Paragraph type="secondary">
-          联系微信 <Typography.Text code>jarlandliu</Typography.Text> 或邮箱{" "}
-          <Typography.Text code>jarland@mingansec.com</Typography.Text> 获取{" "}
-          <Typography.Text code>license.lic</Typography.Text>
-          （需同时部署厂商提供的公钥）。导入后请重启服务。
-        </Typography.Paragraph>
+      <Card title={t("license.titleImport")}>
+        <Typography.Paragraph type="secondary">{t("license.importHint")}</Typography.Paragraph>
         <Upload
           accept=".lic"
           maxCount={1}
@@ -109,7 +114,7 @@ export default function LicensePage() {
           }}
         >
           <Button type="primary" loading={importLic.isPending}>
-            选择 .lic 文件
+            {t("license.pickFile")}
           </Button>
         </Upload>
       </Card>

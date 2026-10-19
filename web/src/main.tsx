@@ -1,12 +1,17 @@
-import React from "react";
+import React, { useMemo } from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { ConfigProvider } from "antd";
+import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
 import App from "./App";
+import { I18nProvider, useI18n } from "./i18n/I18nProvider";
+import { persistLang, getInitialLang } from "./i18n/core";
 import "antd/dist/reset.css";
 import "./styles/theme.css";
+
+persistLang(getInitialLang());
 
 const theme = {
   token: {
@@ -35,12 +40,24 @@ const queryClient = new QueryClient({
   },
 });
 
+function AntLocaleRoot({ children }: { children: React.ReactNode }) {
+  const { lang } = useI18n();
+  const locale = useMemo(() => (lang === "zh" ? zhCN : enUS), [lang]);
+  return (
+    <ConfigProvider locale={locale} theme={theme}>
+      {children}
+    </ConfigProvider>
+  );
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ConfigProvider locale={zhCN} theme={theme}>
-        <App />
-      </ConfigProvider>
+      <I18nProvider>
+        <AntLocaleRoot>
+          <App />
+        </AntLocaleRoot>
+      </I18nProvider>
     </QueryClientProvider>
   </React.StrictMode>,
 );

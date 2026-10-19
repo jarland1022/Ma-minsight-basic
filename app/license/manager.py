@@ -206,8 +206,8 @@ class Manager:
             "fingerprint": fp_hash,
             "source": source,
             "hint": (
-                "将 fingerprint 发给厂商（微信 jarlandliu / jarland@mingansec.com），"
-                "获取专业版 license.lic 后在控制台导入"
+                "Send this fingerprint to the vendor (WeChat jarlandliu / "
+                "jarland@mingansec.com) to receive license.lic, then import it in the console"
             ),
             "algo": FP_V2_PREFIX,
         }
@@ -346,9 +346,11 @@ class Manager:
         # Agent / WeCom / defense / eval need an imported license.lic.
         if is_community_edition():
             info.status = "community"
+            # English default (GitHub / international). Web console localizes via i18n.
             info.hint = (
-                "当前为社区版：入库/初筛/聚合/事件台可用。"
-                "导入专业版 license.lic 后可解锁 AI Agent、企微协查、防御资产与评测。"
+                "Community Edition: ingest / triage / aggregate / events available. "
+                "Import a Professional license.lic to unlock AI Agent, WeCom review, "
+                "defense assets, and eval."
             )
             return info
 
@@ -391,7 +393,7 @@ class Manager:
             return info
 
         info.status = "no_license"
-        info.hint = "请在控制台导入 license.lic（由厂商签发）"
+        info.hint = "Import a vendor-issued license.lic in the console"
         return info
 
     @staticmethod

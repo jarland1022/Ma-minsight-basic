@@ -1,7 +1,7 @@
 [project]
 name = "ma-minsight"
 version = "0.1.0"
-description = "MA-MinSight Community — SIEM alert triage (ingest / rule triage / aggregation)"
+description = "MA-MinSight Community — SIEM alert triage (EN default docs/UI; ZH switchable)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

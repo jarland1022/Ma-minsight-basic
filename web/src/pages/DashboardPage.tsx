@@ -5,8 +5,10 @@ import { api, formatApiError } from "../api/client";
 import UserGuidePanel from "../components/UserGuidePanel";
 import { PAGE_GUIDES, QUICK_START_STEPS } from "../content/userGuide";
 import type { NoisyRulesResponse } from "../types/api";
+import { useI18n } from "../i18n/I18nProvider";
 
 export default function DashboardPage() {
+  const { t, lang } = useI18n();
   const { data, isLoading, isError, error, dataUpdatedAt, refetch, isFetching } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => (await api.get("/dashboard/summary")).data,
@@ -19,7 +21,7 @@ export default function DashboardPage() {
   });
 
   if (isLoading) {
-    return <Typography.Text>加载中...</Typography.Text>;
+    return <Typography.Text>{t("common.loading")}</Typography.Text>;
   }
 
   if (isError || !data) {
@@ -27,12 +29,12 @@ export default function DashboardPage() {
       <Alert
         type="warning"
         showIcon
-        message="无法加载仪表盘"
+        message={t("dashboard.loadFailed")}
         description={
           <>
-            {isError ? formatApiError(error) : "接口未返回数据"}
+            {isError ? formatApiError(error) : t("dashboard.noData")}
             <br />
-            若长时间停留在此，请尝试退出登录后重新登录；或执行{" "}
+            若长时间停留在此，请尝试退出登录后重新登录；或在 ECS 上执行{" "}
             <Typography.Text code>docker compose exec app alembic upgrade head</Typography.Text>
             完成数据库迁移。
           </>
@@ -46,12 +48,12 @@ export default function DashboardPage() {
   const hc = data.eval?.last_health_check;
   const pipeline = data.pipeline_last_run ?? {};
   const pipelineLabels: Record<string, string> = {
-    ingestion: "入库",
-    triage: "初筛",
-    aggregation: "聚合",
-    investigation: "Agent 调查",
-    human_review: "协查派发",
-    defense_assets: "防御资产",
+    ingestion: t("dashboard.pipelineIngest"),
+    triage: t("dashboard.pipelineTriage"),
+    aggregation: t("dashboard.pipelineAggregate"),
+    investigation: t("dashboard.pipelineInvestigation"),
+    human_review: t("dashboard.pipelineHuman"),
+    defense_assets: t("dashboard.pipelineDefense"),
   };
 
   return (
@@ -60,12 +62,16 @@ export default function DashboardPage() {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="MA-MinSight 社区版"
+        message={t("dashboard.communityTitle")}
         description={
           <>
-            免费能力：告警入库 → 初筛 → 聚合 → 事件台 / 技能库。AI Agent、企微协查、防御资产、评测需{" "}
-            <Link to="/license">导入专业版 License</Link>。对照说明见仓库{" "}
-            <Typography.Text code>docs/community-vs-pro.md</Typography.Text>。
+            {t("dashboard.communityBody")}{" "}
+            <Link to="/license">{t("dashboard.communityLink")}</Link>.{" "}
+            {t("dashboard.compareDoc")} (
+            <Typography.Text code>
+              {lang === "zh" ? "docs/community-vs-pro.zh-CN.md" : "docs/community-vs-pro.md"}
+            </Typography.Text>
+            ).
           </>
         }
       />

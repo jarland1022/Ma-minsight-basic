@@ -44,14 +44,22 @@ export function EvidenceStrengthTag({ strength }: { strength: string | null | un
   return <Tag color={info?.color || "default"}>{info?.label ?? strength}</Tag>;
 }
 
-export function eventStatusLabel(status: string | null | undefined): string {
-  const map: Record<string, string> = {
-    pending_review: "待调查",
-    investigating: "调查中",
-    human_pending: "协查中",
-    concluded: "已结论",
-    closed: "已关闭",
-  };
+export function eventStatusLabel(
+  status: string | null | undefined,
+  t?: (path: string) => string,
+): string {
   if (!status) return "—";
+  if (t) {
+    const key = `events.status.${status}`;
+    const labeled = t(key);
+    if (labeled !== key) return labeled;
+  }
+  const map: Record<string, string> = {
+    pending_review: "Pending review",
+    investigating: "Investigating",
+    human_pending: "Human review",
+    concluded: "Concluded",
+    closed: "Closed",
+  };
   return map[status] ?? status;
 }

@@ -1,16 +1,16 @@
-# MA-MinSight License（社区仓库说明）
+﻿# MA-MinSight License (Community)
 
-本目录用于放置：
+Files in this directory:
 
-| 文件 | 是否进 Git | 说明 |
-|------|------------|------|
-| `ma-minsight-public.pem` | ✅ 已收录（验签公钥） | 导入专业版 License 时用于验签 |
-| `license.lic` | **禁止提交** | 客户节点授权文件（Docker 卷挂载持久化） |
-| `*-private.pem` | **禁止出现在本仓库** | 仅厂商签发机保存 |
+| File | In Git? | Notes |
+|------|---------|--------|
+| `ma-minsight-public.pem` | Yes (verify key) | Used to verify Professional `license.lic` |
+| `license.lic` | **Never commit** | Customer node license (persisted via Docker volume) |
+| `*-private.pem` | **Must not appear** | Vendor signing machine only |
 
-社区版默认**不提供**自动 Pro 试用宽限。导入有效 `license.lic` 并**重启应用**后，解锁 Agent / 企微协查 / 防御资产 / 评测。
+Community has **no** silent Pro trial. Import a valid `license.lic` and **restart** to unlock Agent / WeCom review / defense assets / eval.
 
-Compose 已挂载 `./configs/license` → `/app/configs/license`，避免重建镜像丢失授权文件。
+Compose mounts `./configs/license` → `/app/configs/license`.
 
-购买与试用：微信 `jarlandliu`，邮箱 `jarland@mingansec.com`。  
-能力对照：[`docs/community-vs-pro.md`](../docs/community-vs-pro.md)。
+Contact: WeChat `jarlandliu` · email `jarland@mingansec.com`  
+Compare editions: [`docs/community-vs-pro.md`](../docs/community-vs-pro.md) · [中文](../docs/community-vs-pro.zh-CN.md)

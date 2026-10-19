@@ -25,3 +25,9 @@ configs/license/*-private.pem
 configs/license/license.lic
 configs/license/.grace_*
 .grace_*
+
+# Overseas landing local build
+docs/marketing/overseas/landing.env
+site/index.html
+site/CNAME
+site-preview.html

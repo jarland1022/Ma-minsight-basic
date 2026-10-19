@@ -20,6 +20,7 @@ import {
   message,
 } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useI18n } from "../i18n/I18nProvider";
 import { api, formatApiError } from "../api/client";
 import type { DiagnosticCheck, IngestionDiagnosticsReport } from "../types/api";
 
@@ -59,7 +60,7 @@ function CheckItem({ check }: { check: DiagnosticCheck }) {
           )}
           {check.suggestion && (
             <Typography.Text type="warning" style={{ fontSize: 12 }}>
-              建议：{check.suggestion}
+              {t("ingestDiag.suggestion", { text: check.suggestion })}
             </Typography.Text>
           )}
         </div>
@@ -69,6 +70,8 @@ function CheckItem({ check }: { check: DiagnosticCheck }) {
 }
 
 export default function IngestionDiagnosticsPanel() {
+  const { t } = useI18n();
+
   const qc = useQueryClient();
   const { data: me } = useQuery({
     queryKey: ["auth-me"],
@@ -96,7 +99,7 @@ export default function IngestionDiagnosticsPanel() {
         })
       ).data,
     onSuccess: () => {
-      message.success("已扩大回溯至 7 天并重置游标，请点击「告警入库」重新拉取");
+      message.success(t("ingestDiag.expandOk"));
       qc.invalidateQueries({ queryKey: ["diagnostics-ingestion"] });
     },
     onError: (error) => message.error(formatApiError(error)),
@@ -109,8 +112,8 @@ export default function IngestionDiagnosticsPanel() {
       <Alert
         type="info"
         showIcon
-        message="一键排查告警入库"
-        description="自动检测 Wazuh Indexer 连接、游标状态与回溯窗口，并给出可操作的修复建议。无需登录服务器或执行 SQL。"
+        message={t("ingestDiag.title")}
+        description={t("ingestDiag.description")}
       />
 
       <Space wrap>
@@ -125,13 +128,13 @@ export default function IngestionDiagnosticsPanel() {
       </Space>
 
       {isLoading && !report ? (
-        <Spin tip="正在检测…" />
+        <Spin tip={t("ingestDiag.checking")} />
       ) : report ? (
         <>
           <Alert
             type={OVERALL_ALERT[report.overall_status] ?? "info"}
             showIcon
-            message={`整体状态：${report.overall_status === "ok" ? "正常" : report.overall_status === "warn" ? "需关注" : "异常"}`}
+            message={report.overall_status === "ok" ? t("ingestDiag.overallOk") : report.overall_status === "warn" ? t("ingestDiag.overallWarn") : t("ingestDiag.overallError")}
             description={report.summary}
           />
 
@@ -159,7 +162,7 @@ export default function IngestionDiagnosticsPanel() {
                   <ToolOutlined />
                   <span>{source.name}</span>
                   <Tag>{source.adapter_type}</Tag>
-                  {!source.is_active && <Tag color="default">已禁用</Tag>}
+                  {!source.is_active && <Tag color="default">{t("ingestDiag.disabled")}</Tag>}
                   <Tag
                     color={
                       source.overall_status === "ok"
@@ -184,33 +187,33 @@ export default function IngestionDiagnosticsPanel() {
                   ))}
 
                   <Descriptions size="small" bordered column={2}>
-                    <Descriptions.Item label="库内告警数">
+                    <Descriptions.Item label={t("ingestDiag.alertCount")}>
                       {source.stats.alerts_in_db}
                     </Descriptions.Item>
-                    <Descriptions.Item label="游标位置">
-                      {formatTs(source.stats.cursor_last_occurred_at) || "空（初始回溯）"}
+                    <Descriptions.Item label={t("ingestDiag.cursor")}>
+                      {formatTs(source.stats.cursor_last_occurred_at) || t("ingestDiag.cursorEmpty")}
                     </Descriptions.Item>
-                    <Descriptions.Item label="Indexer 最新告警">
+                    <Descriptions.Item label={t("ingestDiag.indexerLatest")}>
                       {formatTs(source.stats.indexer_latest_at)}
                     </Descriptions.Item>
-                    <Descriptions.Item label="Indexer 总量">
+                    <Descriptions.Item label={t("ingestDiag.indexerTotal")}>
                       {source.stats.indexer_total_alerts ?? "—"}
                     </Descriptions.Item>
-                    <Descriptions.Item label="回溯窗口">
+                    <Descriptions.Item label={t("ingestDiag.lookback")}>
                       {source.stats.initial_lookback_hours != null
                         ? `${source.stats.initial_lookback_hours} 小时`
                         : "—"}
                     </Descriptions.Item>
-                    <Descriptions.Item label="窗口内可拉取">
+                    <Descriptions.Item label={t("ingestDiag.fetchable")}>
                       {source.stats.window_match_count ?? "—"}
                     </Descriptions.Item>
-                    <Descriptions.Item label="Indexer 地址" span={2}>
+                    <Descriptions.Item label={t("ingestDiag.indexerUrl")} span={2}>
                       {source.stats.indexer_url ?? "—"}
                     </Descriptions.Item>
-                    <Descriptions.Item label="上次成功拉取">
+                    <Descriptions.Item label={t("ingestDiag.lastSuccess")}>
                       {formatTs(source.stats.last_successful_run_at)}
                     </Descriptions.Item>
-                    <Descriptions.Item label="检测时间">
+                    <Descriptions.Item label={t("ingestDiag.checkedAt")}>
                       {formatTs(report.generated_at)}
                     </Descriptions.Item>
                   </Descriptions>

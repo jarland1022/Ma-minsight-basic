@@ -2,6 +2,7 @@ import { Card, Input, Select, Space, Table, Tag, Typography } from "antd";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
+import { useI18n } from "../i18n/I18nProvider";
 
 type Playbook = {
   id: string;
@@ -70,6 +71,7 @@ function intensityClass(count: number, max: number): string {
 }
 
 export default function PlaybooksPage() {
+  const { t, lang } = useI18n();
   const [domain, setDomain] = useState<string | undefined>();
   const [category, setCategory] = useState<string | undefined>();
   const [pack, setPack] = useState<string | undefined>();
@@ -100,11 +102,15 @@ export default function PlaybooksPage() {
   const filtered = useMemo(() => {
     let items = data?.items ?? [];
     if (techniqueFilter) {
-      const t = techniqueFilter.toUpperCase();
+      const techId = techniqueFilter.toUpperCase();
       items = items.filter((item) =>
         item.mitre_attack.some((id) => {
           const u = id.toUpperCase();
-          return u === t || u.startsWith(`${t}.`) || (t.includes(".") && u === t.split(".")[0]);
+          return (
+            u === techId ||
+            u.startsWith(`${techId}.`) ||
+            (techId.includes(".") && u === techId.split(".")[0])
+          );
         }),
       );
     }
@@ -116,7 +122,7 @@ export default function PlaybooksPage() {
         item.id.toLowerCase().includes(q) ||
         item.summary.toLowerCase().includes(q) ||
         (item.source_skill || "").toLowerCase().includes(q) ||
-        item.mitre_attack.some((t) => t.toLowerCase().includes(q)),
+        item.mitre_attack.some((id) => id.toLowerCase().includes(q)),
     );
   }, [data?.items, keyword, techniqueFilter]);
 
@@ -127,24 +133,28 @@ export default function PlaybooksPage() {
     <Space direction="vertical" style={{ width: "100%" }} size="large">
       <Card>
         <Typography.Title level={4} style={{ marginTop: 0 }}>
-          技能库 / 调查剧本
+          {t("playbooks.title")}
         </Typography.Title>
         <Typography.Paragraph type="secondary">
-          {data?.note ||
-            "精选防御向调查剧本。调查时会按告警类别自动注入 Agent 提示词；这里展示产品覆盖的场景与 ATT&CK 映射。"}
+          {data?.note || t("playbooks.intro")}
         </Typography.Paragraph>
         <Space wrap>
           <Typography.Text>
-            共 {data?.total ?? 0} 条（核心 {data?.curated_count ?? "—"} / 社区防御子集{" "}
-            {data?.community_count ?? "—"}）
+            {t("playbooks.totalLine", {
+              total: data?.total ?? 0,
+              curated: data?.curated_count ?? "—",
+              community: data?.community_count ?? "—",
+            })}
           </Typography.Text>
           {typeof data?.mitre_attack_coverage === "number" ? (
-            <Tag color="blue">ATT&CK 技术 {data.mitre_attack_coverage}</Tag>
+            <Tag color="blue">
+              {t("playbooks.attackTech", { count: data.mitre_attack_coverage })}
+            </Tag>
           ) : null}
           {data?.community_license ? <Tag>{data.community_license}</Tag> : null}
           <Select
             allowClear
-            placeholder="来源包"
+            placeholder={t("playbooks.packPlaceholder")}
             style={{ width: 160 }}
             value={pack}
             onChange={(v) => {
@@ -152,13 +162,13 @@ export default function PlaybooksPage() {
               setTechniqueFilter(null);
             }}
             options={[
-              { value: "curated", label: "核心剧本" },
-              { value: "community", label: "社区防御子集" },
+              { value: "curated", label: t("playbooks.packCurated") },
+              { value: "community", label: t("playbooks.packCommunity") },
             ]}
           />
           <Select
             allowClear
-            placeholder="领域"
+            placeholder={t("playbooks.domainPlaceholder")}
             style={{ width: 160 }}
             value={domain}
             onChange={setDomain}
@@ -166,7 +176,7 @@ export default function PlaybooksPage() {
           />
           <Select
             allowClear
-            placeholder="告警类别"
+            placeholder={t("playbooks.categoryPlaceholder")}
             style={{ width: 200 }}
             value={category}
             onChange={setCategory}
@@ -174,7 +184,7 @@ export default function PlaybooksPage() {
           />
           <Input.Search
             allowClear
-            placeholder="搜索名称 / ATT&CK"
+            placeholder={t("playbooks.searchPlaceholder")}
             style={{ width: 240 }}
             onSearch={setKeyword}
             onChange={(e) => setKeyword(e.target.value)}
@@ -183,13 +193,15 @@ export default function PlaybooksPage() {
       </Card>
 
       <Card
-        title="ATT&CK 覆盖看板"
+        title={t("playbooks.coverageTitle")}
         loading={coverageLoading}
         extra={
           <Space size="middle">
             <Typography.Text type="secondary">
-              覆盖 {coverage?.covered_techniques ?? 0} 个父技术 · {coverage?.total_playbooks ?? 0}{" "}
-              条剧本
+              {t("playbooks.coverageStats", {
+                tech: coverage?.covered_techniques ?? 0,
+                books: coverage?.total_playbooks ?? 0,
+              })}
             </Typography.Text>
             {techniqueFilter ? (
               <Tag
@@ -198,63 +210,74 @@ export default function PlaybooksPage() {
                 onClose={() => setTechniqueFilter(null)}
                 style={{ marginInlineEnd: 0 }}
               >
-                筛选 {techniqueFilter}
+                {t("playbooks.filterTag", { id: techniqueFilter })}
               </Tag>
             ) : (
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                点击技术 ID 筛选下方列表
+                {t("playbooks.clickHint")}
               </Typography.Text>
             )}
           </Space>
         }
       >
         <div className="ms-atk-board" role="list">
-          {(coverage?.tactics ?? []).map((tactic) => (
-            <div key={tactic.key} className="ms-atk-col" role="listitem">
-              <div className="ms-atk-col-head">
-                <div className="ms-atk-col-title">{tactic.name_zh}</div>
-                <div className="ms-atk-col-sub">
-                  {tactic.name} · {tactic.technique_count}
+          {(coverage?.tactics ?? []).map((tactic) => {
+            const primary = lang === "zh" ? tactic.name_zh : tactic.name;
+            const secondary = lang === "zh" ? tactic.name : tactic.name_zh;
+            return (
+              <div key={tactic.key} className="ms-atk-col" role="listitem">
+                <div className="ms-atk-col-head">
+                  <div className="ms-atk-col-title">{primary}</div>
+                  <div className="ms-atk-col-sub">
+                    {secondary} · {tactic.technique_count}
+                  </div>
+                </div>
+                <div className="ms-atk-col-body">
+                  {tactic.techniques.length === 0 ? (
+                    <div className="ms-atk-gap">{t("playbooks.noCoverage")}</div>
+                  ) : (
+                    tactic.techniques.map((tech) => (
+                      <button
+                        key={tech.technique_id}
+                        type="button"
+                        className={`${intensityClass(tech.playbook_count, maxCount)}${
+                          techniqueFilter === tech.technique_id ? " active" : ""
+                        }`}
+                        title={t("playbooks.playbookCount", {
+                          id: tech.technique_id,
+                          count: tech.playbook_count,
+                        })}
+                        onClick={() =>
+                          setTechniqueFilter((prev) =>
+                            prev === tech.technique_id ? null : tech.technique_id,
+                          )
+                        }
+                      >
+                        <span className="ms-atk-id">{tech.technique_id}</span>
+                        <span className="ms-atk-n">{tech.playbook_count}</span>
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
-              <div className="ms-atk-col-body">
-                {tactic.techniques.length === 0 ? (
-                  <div className="ms-atk-gap">暂无覆盖</div>
-                ) : (
-                  tactic.techniques.map((tech) => (
-                    <button
-                      key={tech.technique_id}
-                      type="button"
-                      className={`${intensityClass(tech.playbook_count, maxCount)}${
-                        techniqueFilter === tech.technique_id ? " active" : ""
-                      }`}
-                      title={`${tech.technique_id}: ${tech.playbook_count} 条剧本`}
-                      onClick={() =>
-                        setTechniqueFilter((prev) =>
-                          prev === tech.technique_id ? null : tech.technique_id,
-                        )
-                      }
-                    >
-                      <span className="ms-atk-id">{tech.technique_id}</span>
-                      <span className="ms-atk-n">{tech.playbook_count}</span>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <div className="ms-atk-legend">
-          <span>剧本关联密度</span>
-          <span className="ms-atk-cell low legend">低</span>
-          <span className="ms-atk-cell mid legend">中</span>
-          <span className="ms-atk-cell hot legend">高</span>
+          <span>{t("playbooks.density")}</span>
+          <span className="ms-atk-cell low legend">{t("playbooks.densityLow")}</span>
+          <span className="ms-atk-cell mid legend">{t("playbooks.densityMid")}</span>
+          <span className="ms-atk-cell hot legend">{t("playbooks.densityHigh")}</span>
         </div>
       </Card>
 
       <Space align="start" style={{ width: "100%" }} size="large">
         <Card
-          title={techniqueFilter ? `剧本列表 · ${techniqueFilter}` : "剧本列表"}
+          title={
+            techniqueFilter
+              ? t("playbooks.listTitleFiltered", { id: techniqueFilter })
+              : t("playbooks.listTitle")
+          }
           style={{ flex: 1, minWidth: 0 }}
           loading={isLoading}
         >
@@ -269,17 +292,21 @@ export default function PlaybooksPage() {
               style: { cursor: "pointer" },
             })}
             columns={[
-              { title: "名称", dataIndex: "name" },
+              { title: t("playbooks.colName"), dataIndex: "name" },
               {
-                title: "来源",
+                title: t("playbooks.colPack"),
                 dataIndex: "pack",
                 width: 100,
                 render: (p: string | undefined) =>
-                  p === "community" ? <Tag color="cyan">社区</Tag> : <Tag color="geekblue">核心</Tag>,
+                  p === "community" ? (
+                    <Tag color="cyan">{t("playbooks.tagCommunity")}</Tag>
+                  ) : (
+                    <Tag color="geekblue">{t("playbooks.tagCurated")}</Tag>
+                  ),
               },
-              { title: "领域", dataIndex: "domain", width: 110 },
+              { title: t("playbooks.colDomain"), dataIndex: "domain", width: 110 },
               {
-                title: "类别",
+                title: t("playbooks.colCategory"),
                 dataIndex: "alert_categories",
                 render: (cats: string[]) =>
                   cats.filter((c) => c !== "*").slice(0, 2).map((c) => <Tag key={c}>{c}</Tag>),
@@ -293,20 +320,22 @@ export default function PlaybooksPage() {
           />
         </Card>
 
-        <Card title={selected?.name || "剧本详情"} style={{ width: 420 }}>
+        <Card title={selected?.name || t("playbooks.detailTitle")} style={{ width: 420 }}>
           {!selected ? (
-            <Typography.Text type="secondary">选择左侧剧本查看详情</Typography.Text>
+            <Typography.Text type="secondary">{t("playbooks.selectHint")}</Typography.Text>
           ) : (
             <Space direction="vertical" style={{ width: "100%" }}>
               <Typography.Text type="secondary">{selected.id}</Typography.Text>
               {selected.pack === "community" ? (
-                <Tag color="cyan">社区防御子集 · {selected.license || "Apache-2.0"}</Tag>
+                <Tag color="cyan">
+                  {t("playbooks.packCommunity")} · {selected.license || "Apache-2.0"}
+                </Tag>
               ) : (
-                <Tag color="geekblue">核心剧本</Tag>
+                <Tag color="geekblue">{t("playbooks.packCurated")}</Tag>
               )}
               <Typography.Paragraph>{selected.summary}</Typography.Paragraph>
               <div>
-                <Typography.Text strong>绑定类别</Typography.Text>
+                <Typography.Text strong>{t("playbooks.bindCategories")}</Typography.Text>
                 <div style={{ marginTop: 6 }}>
                   {selected.alert_categories.map((c) => (
                     <Tag key={c}>{c}</Tag>
@@ -332,7 +361,7 @@ export default function PlaybooksPage() {
                 </div>
               </div>
               <div>
-                <Typography.Text strong>调查要点</Typography.Text>
+                <Typography.Text strong>{t("playbooks.steps")}</Typography.Text>
                 <ul style={{ paddingLeft: 18, marginBottom: 0 }}>
                   {selected.investigation_steps.map((step) => (
                     <li key={step}>{step}</li>
@@ -350,7 +379,7 @@ export default function PlaybooksPage() {
                 </div>
               </div>
               <div>
-                <Typography.Text strong>协查问题示例</Typography.Text>
+                <Typography.Text strong>{t("playbooks.humanQuestions")}</Typography.Text>
                 <ul style={{ paddingLeft: 18, marginBottom: 0 }}>
                   {selected.human_questions.map((q) => (
                     <li key={q}>{q}</li>
@@ -359,7 +388,7 @@ export default function PlaybooksPage() {
               </div>
               {selected.source_skill ? (
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  上游 skill: {selected.source_skill}
+                  {t("playbooks.upstreamSkill", { skill: selected.source_skill })}
                 </Typography.Text>
               ) : null}
             </Space>

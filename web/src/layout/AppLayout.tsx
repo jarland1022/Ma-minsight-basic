@@ -13,6 +13,8 @@ import {
   KeyOutlined,
 } from "@ant-design/icons";
 import { api, logout } from "../api/client";
+import LanguageSwitch from "../components/LanguageSwitch";
+import { useI18n } from "../i18n/I18nProvider";
 
 type NavChild = {
   path: string;
@@ -26,45 +28,56 @@ type NavModule = {
   children: NavChild[];
 };
 
-const MODULES: NavModule[] = [
-  {
-    key: "home",
-    label: "首页",
-    children: [{ path: "/", label: "仪表盘", icon: <DashboardOutlined /> }],
-  },
-  {
-    key: "review",
-    label: "研判",
-    children: [
-      { path: "/events", label: "事件队列", icon: <ClusterOutlined /> },
-      { path: "/human-review", label: "人工协查 (Pro)", icon: <MessageOutlined /> },
-      { path: "/playbooks", label: "技能库", icon: <BookOutlined /> },
+function useModules(): NavModule[] {
+  const { t } = useI18n();
+  return useMemo(
+    () => [
+      {
+        key: "home",
+        label: t("nav.home"),
+        children: [{ path: "/", label: t("nav.dashboard"), icon: <DashboardOutlined /> }],
+      },
+      {
+        key: "review",
+        label: t("nav.review"),
+        children: [
+          { path: "/events", label: t("nav.events"), icon: <ClusterOutlined /> },
+          { path: "/human-review", label: t("nav.humanReview"), icon: <MessageOutlined /> },
+          { path: "/playbooks", label: t("nav.playbooks"), icon: <BookOutlined /> },
+        ],
+      },
+      {
+        key: "defense",
+        label: t("nav.defense"),
+        children: [
+          { path: "/defense-assets", label: t("nav.defenseAssets"), icon: <SafetyOutlined /> },
+        ],
+      },
+      {
+        key: "system",
+        label: t("nav.system"),
+        children: [
+          { path: "/guide", label: t("nav.guide"), icon: <QuestionCircleOutlined /> },
+          { path: "/eval", label: t("nav.eval"), icon: <ExperimentOutlined /> },
+          { path: "/license", label: t("nav.license"), icon: <KeyOutlined /> },
+          { path: "/settings", label: t("nav.settings"), icon: <SettingOutlined /> },
+        ],
+      },
     ],
-  },
-  {
-    key: "defense",
-    label: "防御",
-    children: [{ path: "/defense-assets", label: "防御资产 (Pro)", icon: <SafetyOutlined /> }],
-  },
-  {
-    key: "system",
-    label: "系统",
-    children: [
-      { path: "/guide", label: "使用指南", icon: <QuestionCircleOutlined /> },
-      { path: "/eval", label: "评测 (Pro)", icon: <ExperimentOutlined /> },
-      { path: "/license", label: "License", icon: <KeyOutlined /> },
-      { path: "/settings", label: "设置", icon: <SettingOutlined /> },
-    ],
-  },
-];
+    [t],
+  );
+}
 
-function matchModule(pathname: string): { module: NavModule; child: NavChild } {
+function matchModule(
+  pathname: string,
+  modules: NavModule[],
+): { module: NavModule; child: NavChild } {
   if (pathname.startsWith("/investigations/")) {
-    const review = MODULES.find((m) => m.key === "review")!;
+    const review = modules.find((m) => m.key === "review")!;
     const events = review.children.find((c) => c.path === "/events")!;
     return { module: review, child: events };
   }
-  for (const mod of MODULES) {
+  for (const mod of modules) {
     for (const child of mod.children) {
       if (child.path === "/") {
         if (pathname === "/") {
@@ -77,13 +90,18 @@ function matchModule(pathname: string): { module: NavModule; child: NavChild } {
       }
     }
   }
-  return { module: MODULES[0], child: MODULES[0].children[0] };
+  return { module: modules[0], child: modules[0].children[0] };
 }
 
 export default function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { module, child } = useMemo(() => matchModule(location.pathname), [location.pathname]);
+  const { t } = useI18n();
+  const modules = useModules();
+  const { module, child } = useMemo(
+    () => matchModule(location.pathname, modules),
+    [location.pathname, modules],
+  );
 
   const { data: me } = useQuery({
     queryKey: ["auth-me"],
@@ -102,7 +120,6 @@ export default function AppLayout() {
   });
   const lic = licenseData?.license;
   const proEnabled = Boolean(licenseData?.pro_enabled);
-  // Community without Pro license: soft banner. Expired/invalid Pro license: stronger banner.
   const showLicenseBanner = Boolean(lic && lic.status !== "active");
   const bannerTone =
     lic?.status === "community" || lic?.status === "no_license" ? "warn" : "error";
@@ -111,11 +128,13 @@ export default function AppLayout() {
     <div className="ms-shell">
       <header className="ms-header">
         <Link to="/" className="ms-header-brand">
-          <span className="ms-header-logo">MA-MinSight</span>
-          <span className="ms-header-model">{proEnabled ? "Pro" : "Community"}</span>
+          <span className="ms-header-logo">{t("brand.product")}</span>
+          <span className="ms-header-model">
+            {proEnabled ? t("brand.pro") : t("brand.community")}
+          </span>
         </Link>
-        <nav className="ms-topnav" aria-label="主模块">
-          {MODULES.map((mod) => (
+        <nav className="ms-topnav" aria-label="Main">
+          {modules.map((mod) => (
             <button
               key={mod.key}
               type="button"
@@ -127,12 +146,13 @@ export default function AppLayout() {
           ))}
         </nav>
         <div className="ms-header-right">
+          <LanguageSwitch />
           {me?.username && <span className="ms-chip">{me.username}</span>}
           <Link className="ms-header-link" to="/guide">
-            使用指南
+            {t("common.guide")}
           </Link>
           <button type="button" className="ms-header-link" onClick={logout}>
-            退出
+            {t("nav.logout")}
           </button>
         </div>
       </header>
@@ -140,12 +160,13 @@ export default function AppLayout() {
       <div className="ms-body">
         <aside className="ms-sidebar">
           <div className="ms-side-title">{module.label}</div>
-          <nav className="ms-sidenav" aria-label="子菜单">
+          <nav className="ms-sidenav" aria-label="Submenu">
             {module.children.map((item) => {
               const active =
                 item.path === "/"
                   ? location.pathname === "/"
-                  : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+                  : location.pathname === item.path ||
+                    location.pathname.startsWith(`${item.path}/`);
               return (
                 <Link
                   key={item.path}
@@ -164,12 +185,11 @@ export default function AppLayout() {
           {showLicenseBanner && lic && (
             <div className={`ms-license-banner ${bannerTone}`} role="status">
               <span>
-                {lic.hint ||
-                  (lic.status === "community"
-                    ? "社区版：入库/初筛/聚合可用；导入 License 解锁 AI Agent 等专业能力"
-                    : `License 状态：${lic.status}`)}
+                {lic.status === "community"
+                  ? t("license.bannerCommunity")
+                  : lic.hint || t("license.bannerStatus", { status: lic.status })}
               </span>
-              <Link to="/license">License</Link>
+              <Link to="/license">{t("license.goLicense")}</Link>
             </div>
           )}
           <div className="ms-crumb">

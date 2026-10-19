@@ -8,14 +8,7 @@ import UserGuidePanel from "../components/UserGuidePanel";
 import { eventStatusLabel } from "../components/VerdictLabels";
 import { EVENT_STATUS_GUIDE, PAGE_GUIDES } from "../content/userGuide";
 import type { EventRow, Paginated } from "../types/api";
-
-const statusTabs = [
-  { key: "", label: "全部" },
-  { key: "pending_review", label: "待调查" },
-  { key: "human_pending", label: "协查中" },
-  { key: "concluded", label: "已结论" },
-  { key: "closed", label: "已关闭" },
-];
+import { useI18n } from "../i18n/I18nProvider";
 
 function formatDateTime(iso: string | null | undefined): string {
   return iso ? iso.slice(0, 19).replace("T", " ") : "—";
@@ -57,6 +50,7 @@ function defaultSortForTab(status: string): { sortBy?: EventSortBy; sortOrder: E
 }
 
 function EventsTable({ status }: { status: string }) {
+  const { t } = useI18n();
   const defaults = useMemo(() => defaultSortForTab(status), [status]);
   const [sortBy, setSortBy] = useState<EventSortBy | undefined>(defaults.sortBy);
   const [sortOrder, setSortOrder] = useState<EventSortOrder>(defaults.sortOrder);
@@ -92,46 +86,46 @@ function EventsTable({ status }: { status: string }) {
 
   const columns: TableColumnsType<EventRow> = [
     {
-      title: "事件",
+      title: t("events.colEvent"),
       dataIndex: "title",
       render: (v, row) => <Link to={`/events/${row.id}`}>{v || row.id}</Link>,
     },
     {
-      title: "状态",
+      title: t("events.colStatus"),
       dataIndex: "status",
       render: (v, row) => (
         <Space size={4} wrap>
           <Tag color={v === "human_pending" ? "orange" : undefined} title={EVENT_STATUS_GUIDE[v]}>
-            {eventStatusLabel(v)}
+            {eventStatusLabel(v, t)}
           </Tag>
           {v === "human_pending" && row.human_review_dispatched === false && (
-            <Tag color="default">待派发</Tag>
+            <Tag color="default">{t("events.tagAwaitDispatch")}</Tag>
           )}
           {v === "human_pending" && row.human_review_is_system_error && (
-            <Tag color="red">系统异常</Tag>
+            <Tag color="red">{t("events.tagSystemError")}</Tag>
           )}
         </Space>
       ),
     },
     {
-      title: "风险",
+      title: t("events.colRisk"),
       dataIndex: "risk_score",
       key: "risk_score",
       sorter: true,
       sortOrder: toAntSortOrder(sortBy, "risk_score", sortOrder),
     },
     {
-      title: "优先级",
+      title: t("events.colPriority"),
       dataIndex: "queue_priority",
       key: "queue_priority",
       sorter: true,
       sortOrder: toAntSortOrder(sortBy, "queue_priority", sortOrder),
     },
-    { title: "告警数", dataIndex: "alert_count" },
+    { title: t("events.colAlerts"), dataIndex: "alert_count" },
     ...(showHumanReviewMeta
       ? [
           {
-            title: "最近调查",
+            title: t("events.colLastInvestigation"),
             dataIndex: "investigation_finished_at",
             key: "investigation_finished_at",
             sorter: true,
@@ -139,7 +133,7 @@ function EventsTable({ status }: { status: string }) {
             render: (v: string | null | undefined) => formatDateTime(v),
           },
           {
-            title: "协查下发",
+            title: t("events.colHumanSent"),
             dataIndex: "human_review_sent_at",
             key: "human_review_sent_at",
             sorter: true,
@@ -147,7 +141,7 @@ function EventsTable({ status }: { status: string }) {
             render: (v: string | null | undefined) => formatDateTime(v),
           },
           {
-            title: "协查问题",
+            title: t("events.colHumanQuestion"),
             dataIndex: "human_review_question",
             ellipsis: true,
             render: (v: string | null | undefined) =>
@@ -168,7 +162,7 @@ function EventsTable({ status }: { status: string }) {
     ...(showConcludedAt
       ? [
           {
-            title: "结论时间",
+            title: t("events.colConcludedAt"),
             dataIndex: "concluded_at",
             key: "concluded_at",
             sorter: true,
@@ -177,8 +171,8 @@ function EventsTable({ status }: { status: string }) {
           },
         ]
       : []),
-    { title: "主机", dataIndex: "aggregate_host_name" },
-    { title: "用户", dataIndex: "aggregate_user_name" },
+    { title: t("events.colHost"), dataIndex: "aggregate_host_name" },
+    { title: t("events.colUser"), dataIndex: "aggregate_user_name" },
   ];
 
   return (
@@ -193,48 +187,41 @@ function EventsTable({ status }: { status: string }) {
 }
 
 export default function EventsPage() {
+  const { t } = useI18n();
+  const statusTabs = [
+    { key: "", label: t("events.tabAll") },
+    { key: "pending_review", label: t("events.tabPending") },
+    { key: "human_pending", label: t("events.tabHuman") },
+    { key: "concluded", label: t("events.tabConcluded") },
+    { key: "closed", label: t("events.tabClosed") },
+  ];
+
   return (
     <>
       <UserGuidePanel guide={PAGE_GUIDES.events} />
-      {statusTabs.find((t) => t.key === "human_pending") && (
-        <Alert
-          type="warning"
-          showIcon
-          style={{ marginBottom: 16 }}
-          message="「协查中」事件需要您处理"
-          description={
-            <>
-              请打开左侧 <Link to="/human-review">人工协查</Link> 用白话回复 AI 的问题；无需安全专业背景。
-              详细说明见 <Link to="/guide">使用指南</Link>。
-            </>
-          }
-        />
-      )}
+      <Alert
+        type="warning"
+        showIcon
+        style={{ marginBottom: 16 }}
+        message={t("events.humanAlertTitle")}
+        description={
+          <>
+            {t("events.humanAlertBody")}{" "}
+            <Link to="/human-review">{t("nav.humanReview")}</Link> ·{" "}
+            <Link to="/guide">{t("common.guide")}</Link>
+          </>
+        }
+      />
       <Tabs
-        items={statusTabs.map((t) => ({
-          key: t.key || "all",
+        items={statusTabs.map((tab) => ({
+          key: tab.key || "all",
           label: (
-            <span title={t.key ? EVENT_STATUS_GUIDE[t.key] : undefined}>
-              {t.label}
-              {t.key === "human_pending" ? " ★" : ""}
+            <span title={tab.key ? EVENT_STATUS_GUIDE[tab.key] : undefined}>
+              {tab.label}
+              {tab.key === "human_pending" ? " ★" : ""}
             </span>
           ),
-          children: (
-            <>
-              {t.key === "human_pending" && (
-                <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-                  默认按「协查下发」时间从新到旧排列；「待派发」表示尚未进入人工协查 Inbox。
-                  协查下发时间越新，越可能是 Agent 复跑后新产生的协查。
-                </Typography.Paragraph>
-              )}
-              {t.key && t.key !== "human_pending" && EVENT_STATUS_GUIDE[t.key] && (
-                <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-                  {EVENT_STATUS_GUIDE[t.key]}
-                </Typography.Paragraph>
-              )}
-              <EventsTable key={t.key || "all"} status={t.key} />
-            </>
-          ),
+          children: <EventsTable status={tab.key} />,
         }))}
       />
     </>
