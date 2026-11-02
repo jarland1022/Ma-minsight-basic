@@ -2,11 +2,7 @@
 
 **English** | [中文](README.zh-CN.md)
 
-Self-hosted **SIEM alert triage console** (open-source Community Edition). Connect Wazuh (or similar) alerts and run:
-
-**Ingest → rule triage → event aggregation → console** (playbooks / ATT&CK coverage included)
-
-**Professional** (AI agent investigation, WeCom human review, defense-asset loop, eval suite, commercial support) unlocks with a **License** — not enabled by default. Contact: WeChat `jarlandliu` · email `jarland@mingansec.com`. Compare editions: [`docs/community-vs-pro.md`](docs/community-vs-pro.md) · [中文对照](docs/community-vs-pro.zh-CN.md).
+Self-hosted **SIEM alert triage** for teams that already run Wazuh (or similar).
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![Edition](https://img.shields.io/badge/Community-open%20source-brightgreen)](docs/community-vs-pro.md)
@@ -14,6 +10,38 @@ Self-hosted **SIEM alert triage console** (open-source Community Edition). Conne
 Repositories:
 - GitHub: https://github.com/jarland1022/Ma-minsight-basic
 - Gitee: https://gitee.com/jarland/Ma-minsight-basic
+
+## What it does
+
+- Routes low-signal noise vs cases that need a human (ingest → rule triage → event aggregation → console)
+- Playbooks / ATT&CK coverage board for the investigation workspace
+- Optional **Professional** upgrade: AI agent investigation, human review, defense-asset loop, eval suite
+- Optional assisted overnight review / **morning note** for day shift (commercial / Pro workflows)
+
+## What it does NOT do
+
+- Silent firewall / WAF policy push
+- Replace your SIEM
+- Require sending your logs to our cloud (runs on **your boundary**)
+
+## Try / demo
+
+| Asset | Link |
+|-------|------|
+| Product (EN) | https://www.mingansec.com/en/minsight.html |
+| Docker trial guide | https://www.mingansec.com/en/docker-trial.html |
+| Sample morning note (demo data) | https://www.mingansec.com/en/morning-note-sample.html |
+| 3-min walkthrough (Loom) | https://www.loom.com/share/f0560485ff674c7d91d08908977760a7 |
+
+**Community Edition** (this repo): open-source console — **Ingest → rule triage → event aggregation → console**.
+
+**Professional** (AI agent, WeCom/human review, defense-asset loop, eval, commercial support) unlocks with a **License** — not enabled by default.  
+Contact: email `jarland@mingansec.com` · WeChat `jarlandliu`.  
+Compare editions: [`docs/community-vs-pro.md`](docs/community-vs-pro.md) · [中文对照](docs/community-vs-pro.zh-CN.md).
+
+## Feedback
+
+Open a GitHub Issue with: **SIEM type**, **alert volume/day**, and whether you need **overnight coverage**.
 
 ## What Community includes
 
@@ -99,7 +127,7 @@ LICENSE / NOTICE     # Apache-2.0
 - [`docs/i18n.md`](docs/i18n.md) — Console language (EN default / 中文)  
 - [`docs/article-siem-minsight.md`](docs/article-siem-minsight.md) — Chinese launch article  
 - [`docs/video-prompts-xiaohongshu-douyin.md`](docs/video-prompts-xiaohongshu-douyin.md) — CN/EN short-video prompts  
-- [`docs/marketing/overseas/`](docs/marketing/overseas/) — **LinkedIn / Upwork / overseas GTM** (same pattern as Ma-WAF)  
+- [`docs/marketing/overseas/`](docs/marketing/overseas/) — **LinkedIn / Upwork / overseas GTM**  
 - [`docs/marketing/landing.html`](docs/marketing/landing.html) · [`docs/marketing/GITHUB_PAGES.md`](docs/marketing/GITHUB_PAGES.md) — **English landing → GitHub Pages**  
 - [Ma-WAF Community](https://github.com/jarland1022/Ma-waf-basic) — open-source WAF  
 

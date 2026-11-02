@@ -2,11 +2,7 @@
 
 [English](README.md) | **中文**
 
-自托管的 **SIEM 告警分诊控制台（开源社区版）**。对接 Wazuh（或同类）告警后，完成：
-
-**入库 → 规则初筛 → 事件聚合 → 控制台查看**（含技能库 / ATT&CK 覆盖视图）
-
-专业版（AI Agent 深度研判、企微人工协查、防御资产闭环、评测与商用支持）**通过 License 解锁**，不在「免费默认可跑」范围。联系：微信 `jarlandliu`，邮箱 `jarland@mingansec.com`。对照：[`docs/community-vs-pro.zh-CN.md`](docs/community-vs-pro.zh-CN.md) · [English](docs/community-vs-pro.md)。
+自托管的 **SIEM 告警分诊**（开源社区版），面向已有 Wazuh（或同类）的团队。
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![Edition](https://img.shields.io/badge/Community-open%20source-brightgreen)](docs/community-vs-pro.zh-CN.md)
@@ -17,6 +13,36 @@
 
 > GitHub 默认展示英文 [`README.md`](README.md)。本页为中文说明。  
 > 控制台默认 **English**，登录页 / 顶栏可切换 **中文**（浏览器本地记住）。详见 [`docs/i18n.md`](docs/i18n.md)。
+
+## 能做什么
+
+- 低价值噪音 vs 需人工处理的路由（入库 → 规则初筛 → 事件聚合 → 控制台）
+- 技能库 / ATT&CK 覆盖看板
+- 可选专业版：AI Agent 研判、人工协查、防御资产闭环、评测
+- 可选夜间协助审阅 / **早班 morning note**（商用 / 专业版流程）
+
+## 明确不做
+
+- 静默下发防火墙 / WAF 策略
+- 替换你的 SIEM
+- 强制把日志送到我们的云（跑在**你的边界内**）
+
+## 试用 / 演示
+
+| 资源 | 链接 |
+|------|------|
+| 产品页（英文） | https://www.mingansec.com/en/minsight.html |
+| Docker 试用说明 | https://www.mingansec.com/en/docker-trial.html |
+| Morning note 样例（演示数据） | https://www.mingansec.com/en/morning-note-sample.html |
+| 3 分钟演示（Loom） | https://www.loom.com/share/f0560485ff674c7d91d08908977760a7 |
+
+**社区版（本仓库）：** 开源控制台 — **入库 → 规则初筛 → 事件聚合 → 控制台**。
+
+**专业版**（AI Agent、企微/人工协查、防御资产、评测、商用支持）**通过 License 解锁**，默认不开启。  
+联系：邮箱 `jarland@mingansec.com` · 微信 `jarlandliu`。  
+对照：[`docs/community-vs-pro.zh-CN.md`](docs/community-vs-pro.zh-CN.md) · [English](docs/community-vs-pro.md)。
+
+反馈请开 Issue，注明：**SIEM 类型**、**日告警量**、是否需要**夜间覆盖**。
 
 ## 社区版能做什么
 
