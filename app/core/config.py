@@ -11,7 +11,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _DEFAULT_ASYNC_DATABASE_URL = (
     "postgresql+asyncpg://ma_minsight:ma_minsight@localhost:5432/ma_minsight"
 )
-_DEFAULT_SYNC_DATABASE_URL = "postgresql://ma_minsight:ma_minsight@localhost:5432/ma_minsight"
+# Explicit psycopg2: SQLAlchemy 2.1+ defaults bare "postgresql://" to psycopg v3.
+_DEFAULT_SYNC_DATABASE_URL = (
+    "postgresql+psycopg2://ma_minsight:ma_minsight@localhost:5432/ma_minsight"
+)
 
 
 class Settings(BaseSettings):
@@ -69,6 +72,31 @@ class Settings(BaseSettings):
     jwt_expire_hours: int = 8
     admin_initial_password: str = "changeme"
 
+    # production | development | test — production refuses weak secrets at startup
+    app_env: str = "development"
+    allow_insecure_defaults: bool = False
+
+    login_rate_limit_max: int = 5
+    login_rate_limit_window_seconds: int = 900
+    bootstrap_token_ttl_minutes: int = 30
+
+    # P0-02 legacy env API_KEY compatibility (D-KEY-02/04). Disable without removing env.
+    # Production may set LEGACY_API_KEY_ENABLED=false after cutover; never restores high-risk.
+    legacy_api_key_enabled: bool = True
+
+    # P0-06 privacy / egress (backend-enforced; see app/privacy/)
+    privacy_pseudonym_secret: str = ""
+    privacy_strict_mode: bool = False
+    privacy_llm_egress_enabled: bool | None = None
+    privacy_ti_egress_enabled: bool | None = None
+    privacy_wecom_egress_enabled: bool | None = None
+    privacy_embed_egress_enabled: bool | None = None
+    privacy_webhook_egress_enabled: bool | None = None
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env.strip().lower() in {"production", "prod"}
+
     @model_validator(mode="after")
     def assemble_database_urls(self) -> Self:
         """Build DB URLs from discrete vars when compose injects POSTGRES_* + DB_HOST."""
@@ -84,7 +112,7 @@ class Settings(BaseSettings):
         password = quote_plus(self.postgres_password)
         base = f"{user}:{password}@{self.db_host}:{self.db_port}/{self.postgres_db}"
         self.database_url = f"postgresql+asyncpg://{base}"
-        self.sync_database_url = f"postgresql://{base}"
+        self.sync_database_url = f"postgresql+psycopg2://{base}"
         return self
 
 

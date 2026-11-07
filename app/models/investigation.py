@@ -160,6 +160,9 @@ class Investigation(Base, CreatedAtMixin):
     started_at: Mapped[datetime] = mapped_column(nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    failure_class: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    failure_detail: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     closure_requested_at: Mapped[datetime | None] = mapped_column(nullable=True)
     closure_retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
@@ -256,6 +259,9 @@ class InvestigationConclusion(Base, CreatedAtMixin):
     verdict: Mapped[InvestigationVerdict] = mapped_column(nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     risk_level: Mapped[RiskLevel] = mapped_column(nullable=False)
+    # Independent dimensions (P0-04); columns added in migration 018.
+    evidence_strength: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    disposition_grade: Mapped[str | None] = mapped_column(String(64), nullable=True)
     reasoning: Mapped[str] = mapped_column(Text, nullable=False)
     recommended_action: Mapped[str | None] = mapped_column(Text, nullable=True)
     evidence_refs: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
@@ -268,8 +274,6 @@ class InvestigationConclusion(Base, CreatedAtMixin):
     refutation_coverage: Mapped[float | None] = mapped_column(Float, nullable=True)
     closure_checks: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     closure_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    evidence_strength: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    disposition_grade: Mapped[str | None] = mapped_column(String(64), nullable=True)
     is_overridden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     overridden_by_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
@@ -277,6 +281,9 @@ class InvestigationConclusion(Base, CreatedAtMixin):
         nullable=True,
     )
     overridden_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    invalidated_as_ops_failure: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    invalidated_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    invalidated_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     investigation: Mapped[Investigation] = relationship(back_populates="conclusion")
     overridden_by: Mapped[User | None] = relationship(foreign_keys=[overridden_by_id])

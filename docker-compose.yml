@@ -1,5 +1,6 @@
 ﻿# MA-MinSight production stack (single-tenant ECS / VM)
 # Usage: cp deploy/env/production.env.example .env && docker compose up -d --build
+# Privacy / egress: set PRIVACY_* in .env (see docs/deploy/privacy-config.md). Compose does not inject PRIVACY_*.
 
 services:
   postgres:
@@ -50,7 +51,6 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       GEOLITE2_CITY_PATH: ${GEOLITE2_CITY_PATH:-/data/geoip/GeoLite2-City.mmdb}
-      MA_MINSIGHT_LICENSE_DIR: /app/configs/license
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,8 +67,6 @@ services:
     volumes:
       # Host file path is configurable; container path must match GEOLITE2_CITY_PATH.
       - ${GEOLITE2_HOST_PATH:-./data/geoip/GeoLite2-City.mmdb}:/data/geoip/GeoLite2-City.mmdb:ro
-      # Persist License / public PEM across rebuilds (never commit private keys or license.lic).
-      - ./configs/license:/app/configs/license
     networks:
       - internal
 

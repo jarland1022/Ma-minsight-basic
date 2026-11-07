@@ -55,6 +55,14 @@ class ThreatIntelSyncService:
         ips: list[str] | None = None,
     ) -> ThreatIntelSyncResult:
         result = ThreatIntelSyncResult()
+        from app.privacy.config import load_privacy_policy
+        from app.privacy.egress_gateway import EgressDeniedError
+
+        pol = await load_privacy_policy(self.session)
+        if not pol.channel_enabled("ti"):
+            result.errors.append("Threat intel egress disabled (privacy.ti_egress_enabled)")
+            return result
+
         providers = self._build_providers()
         if not providers:
             result.errors.append("No threat intel provider configured (set ABUSEIPDB_API_KEY or GREYNOISE_API_KEY)")
@@ -69,60 +77,62 @@ class ThreatIntelSyncService:
         now = as_naive_utc(utc_now())
         expires_at = now + cache_ttl
 
-        async with httpx.AsyncClient(timeout=settings.threat_intel_http_timeout_seconds) as client:
-            for raw_ip in target_ips:
-                ip = normalize_ip(raw_ip)
-                if ip is None:
-                    continue
-                if settings.threat_intel_skip_private_ips and not is_public_ip(ip):
-                    result.skipped_private += 1
-                    continue
-                if not force and await self._has_fresh_cache(ip, now=now):
-                    result.skipped_fresh += 1
-                    continue
+        for raw_ip in target_ips:
+            ip = normalize_ip(raw_ip)
+            if ip is None:
+                continue
+            if settings.threat_intel_skip_private_ips and not is_public_ip(ip):
+                result.skipped_private += 1
+                continue
+            if not force and await self._has_fresh_cache(ip, now=now):
+                result.skipped_fresh += 1
+                continue
 
-                lookup_results: list[IntelLookupResult] = []
-                for provider in providers:
-                    try:
-                        item = await provider.lookup_ip(ip, client)
-                        if item is not None:
-                            lookup_results.append(item)
-                    except httpx.HTTPStatusError as exc:
-                        result.failed += 1
-                        result.errors.append(f"{provider.name}:{ip}: HTTP {exc.response.status_code}")
-                        logger.warning("Provider %s failed for %s", provider.name, ip, exc_info=True)
-                    except Exception as exc:
-                        result.failed += 1
-                        result.errors.append(f"{provider.name}:{ip}: {exc}")
-                        logger.exception("Provider %s failed for %s", provider.name, ip)
+            lookup_results: list[IntelLookupResult] = []
+            for provider in providers:
+                try:
+                    item = await provider.lookup_ip(ip, None)
+                    if item is not None:
+                        lookup_results.append(item)
+                except EgressDeniedError as exc:
+                    result.failed += 1
+                    result.errors.append(f"{provider.name}:{ip}: egress_denied:{exc.reason}")
+                    logger.warning("Provider %s egress denied for IP lookup", provider.name)
+                except httpx.HTTPStatusError as exc:
+                    result.failed += 1
+                    result.errors.append(f"{provider.name}:{ip}: HTTP {exc.response.status_code}")
+                    logger.warning("Provider %s failed for IP lookup", provider.name, exc_info=True)
+                except Exception as exc:
+                    result.failed += 1
+                    result.errors.append(f"{provider.name}:{ip}: {exc}")
+                    logger.exception("Provider %s failed for IP lookup", provider.name)
 
-                merged = merge_lookup_results(lookup_results)
-                if merged is None:
-                    continue
-                if dry_run:
-                    logger.info(
-                        "DRY RUN ip=%s verdict=%s source=%s confidence=%.2f",
-                        ip,
-                        merged.verdict.value,
-                        merged.source,
-                        merged.confidence,
-                    )
-                    result.synced += 1
-                    continue
-
-                self.session.add(
-                    ThreatIntelEntry(
-                        ioc_type=IocType.IP,
-                        ioc_value=ip,
-                        verdict=merged.verdict,
-                        source=merged.source,
-                        confidence=merged.confidence,
-                        raw_response=merged.raw_response,
-                        fetched_at=now,
-                        expires_at=expires_at,
-                    )
+            merged = merge_lookup_results(lookup_results)
+            if merged is None:
+                continue
+            if dry_run:
+                logger.info(
+                    "DRY RUN ip_sync verdict=%s source=%s confidence=%.2f",
+                    merged.verdict.value,
+                    merged.source,
+                    merged.confidence,
                 )
                 result.synced += 1
+                continue
+
+            self.session.add(
+                ThreatIntelEntry(
+                    ioc_type=IocType.IP,
+                    ioc_value=ip,
+                    verdict=merged.verdict,
+                    source=merged.source,
+                    confidence=merged.confidence,
+                    raw_response=merged.raw_response,
+                    fetched_at=now,
+                    expires_at=expires_at,
+                )
+            )
+            result.synced += 1
 
         if result.synced and not dry_run:
             await self.session.commit()

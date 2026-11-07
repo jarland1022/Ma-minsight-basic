@@ -10,17 +10,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_admin, require_auth, require_pro_license
+from app.api.deps import require_admin, require_auth
 from app.db.enums import HealthCheckStage
 from app.db.session import get_async_session
 from app.eval.health_check.runner import HealthCheckRunner
 from app.models.cache_eval import HealthCheckRun, HealthCheckScenario
 
-router = APIRouter(
-    prefix="/api/v1/health-checks",
-    tags=["health-checks"],
-    dependencies=[Depends(require_pro_license)],
-)
+router = APIRouter(prefix="/api/v1/health-checks", tags=["health-checks"])
 
 
 class ScenarioCreateRequest(BaseModel):

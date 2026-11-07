@@ -8,11 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.agent.context import AlertBrief, EventBrief, InvestigationContext, PlaybookBrief, SopBrief
+from app.agent.context import AlertBrief, EventBrief, InvestigationContext, SopBrief
 from app.geoip.enrich import format_src_geo_label
 from app.ingestion.adapters.wazuh.mapper import extract_request_url
 from app.db.enums import HumanReviewStatus
-from app.playbooks.loader import match_playbooks
 from app.services.system_config import get_config_bool
 from app.defense_assets.config import load_defense_asset_config
 from app.defense_assets.disposition.config import load_disposition_config
@@ -63,9 +62,6 @@ async def build_investigation_context(
                 alert_category=alert.alert_category,
                 triage_rule_score=triage.rule_score if triage else None,
                 triage_route=triage.route_decision.value if triage else None,
-                dst_ip=str(alert.dst_ip) if alert.dst_ip else None,
-                process_name=alert.process_name,
-                file_hash=alert.file_hash,
             )
         )
 
@@ -99,19 +95,6 @@ async def build_investigation_context(
     hypothesis_enabled = await get_config_bool(
         session, "investigation.hypothesis_template_enabled", True
     )
-    playbooks = [
-        PlaybookBrief(
-            id=str(p["id"]),
-            name=str(p["name"]),
-            summary=str(p.get("summary") or ""),
-            domain=p.get("domain"),
-            mitre_attack=list(p.get("mitre_attack") or []),
-            investigation_steps=list(p.get("investigation_steps") or []),
-            runtime_skills=list(p.get("runtime_skills") or []),
-            human_questions=list(p.get("human_questions") or []),
-        )
-        for p in match_playbooks(event.primary_category, limit=3)
-    ]
 
     return InvestigationContext(
         investigation_id=investigation_id,
@@ -129,7 +112,6 @@ async def build_investigation_context(
         ),
         alerts=alert_briefs,
         sop=sop,
-        playbooks=playbooks,
         reference_cases=reference_cases,
         human_review_context=human_review_context,
         model_name=model_name,

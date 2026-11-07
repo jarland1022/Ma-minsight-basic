@@ -4,19 +4,17 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.orchestrator import InvestigationOrchestrator
-from app.api.deps import require_auth, require_pro_license
+from app.api.deps import assert_pipeline_permission, require_admin, require_auth, require_write
 from app.db.session import get_async_session
+from app.services.auth import AuthContext
+from app.services.pipeline_audit import begin_pipeline_audit, finalize_pipeline_audit
 
-router = APIRouter(
-    prefix="/api/v1/investigations",
-    tags=["investigations"],
-    dependencies=[Depends(require_pro_license)],
-)
+router = APIRouter(prefix="/api/v1/investigations", tags=["investigations"])
 
 
 class InvestigationRunResponse(BaseModel):
@@ -35,23 +33,81 @@ class InvestigationDetailResponse(BaseModel):
     token_output: int
     skill_call_count: int
     current_step: int
+    error_message: str | None = None
+    failure_class: str | None = None
+    error_code: str | None = None
     conclusion: dict | None
     tool_calls: list[dict]
     message_count: int
 
 
-@router.post("/run", response_model=InvestigationRunResponse, dependencies=[Depends(require_auth)])
+class ReinvestigateResponse(BaseModel):
+    investigation_id: str | None
+    skipped_lock: bool
+    error: str | None = None
+
+
+@router.post("/run", response_model=InvestigationRunResponse)
 async def run_investigations(
+    request: Request,
     limit: int = Query(default=5, ge=1, le=50),
+    auth: AuthContext = Depends(require_write),
     session: AsyncSession = Depends(get_async_session),
 ) -> InvestigationRunResponse:
-    orchestrator = InvestigationOrchestrator(session)
-    result = await orchestrator.run(limit=limit, use_lock=True)
+    assert_pipeline_permission(auth, "investigation")
+    started = await begin_pipeline_audit(
+        session,
+        request,
+        auth,
+        pipeline="investigation",
+        detail={"limit": limit, "source": "investigations/run"},
+    )
+    try:
+        result = await InvestigationOrchestrator(session).run(limit=limit, use_lock=True)
+    except Exception as exc:
+        await finalize_pipeline_audit(started.id, success=False, error=str(exc))
+        raise
+    await finalize_pipeline_audit(
+        started.id,
+        success=True,
+        result_detail={
+            "processed": result.processed,
+            "skipped_lock": result.skipped_lock,
+            "skipped_budget": result.skipped_budget,
+            "errors": result.errors[:20],
+        },
+    )
     return InvestigationRunResponse(
         processed=result.processed,
         skipped_lock=result.skipped_lock,
         skipped_budget=result.skipped_budget,
         errors=result.errors,
+    )
+
+
+@router.post(
+    "/events/{event_id}/reinvestigate",
+    response_model=ReinvestigateResponse,
+    dependencies=[Depends(require_admin)],
+)
+async def reinvestigate_event(
+    event_id: UUID,
+    session: AsyncSession = Depends(get_async_session),
+) -> ReinvestigateResponse:
+    """Explicit admin re-run after ops failure / config fix. Creates a new Investigation."""
+    orchestrator = InvestigationOrchestrator(session)
+    result = await orchestrator.reinvestigate_event(event_id, use_lock=True)
+    if result.error and result.investigation_id is None and not result.skipped_lock:
+        code = (
+            status.HTTP_404_NOT_FOUND
+            if result.error == "Event not found"
+            else status.HTTP_409_CONFLICT
+        )
+        raise HTTPException(status_code=code, detail=result.error)
+    return ReinvestigateResponse(
+        investigation_id=str(result.investigation_id) if result.investigation_id else None,
+        skipped_lock=result.skipped_lock,
+        error=result.error,
     )
 
 

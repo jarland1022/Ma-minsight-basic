@@ -19,7 +19,14 @@ import { api } from "../api/client";
 import EventWorkspace from "../components/EventWorkspace";
 import PageBackHeader from "../components/PageBackHeader";
 import UserGuidePanel from "../components/UserGuidePanel";
-import { VerdictTag, DispositionGradeTag, EvidenceStrengthTag, eventStatusLabel } from "../components/VerdictLabels";
+import {
+  VerdictTag,
+  DispositionGradeTag,
+  EvidenceStrengthTag,
+  InvestigationStatusTag,
+  eventStatusLabel,
+  riskLevelLabel,
+} from "../components/VerdictLabels";
 import { DISPOSITION_GRADE_GUIDE, EVIDENCE_STRENGTH_GUIDE, PAGE_GUIDES, VERDICT_GUIDE } from "../content/userGuide";
 import type { AlertDetailRow, DispositionRow, EventDetail } from "../types/api";
 
@@ -122,15 +129,45 @@ export default function EventDetailPage() {
 
       <Card title={data.title || data.id}>
         <Descriptions column={2}>
-          <Descriptions.Item label={t("eventDetail.status")}>
+          <Descriptions.Item label={t("eventDetail.eventStatus")}>
             <Tag color={data.status === "human_pending" ? "orange" : undefined}>
-              {eventStatusLabel(data.status)}
+              {eventStatusLabel(data.status, t)}
             </Tag>
           </Descriptions.Item>
-          <Descriptions.Item label={t("eventDetail.risk")}>{data.risk_score}</Descriptions.Item>
+          <Descriptions.Item label={t("eventDetail.investigationStatus")}>
+            <InvestigationStatusTag status={latestInv?.status} />
+            {latestInv?.failure_class && (
+              <Tag style={{ marginLeft: 4 }}>{latestInv.failure_class}</Tag>
+            )}
+          </Descriptions.Item>
+          <Descriptions.Item label={t("eventDetail.securityVerdict")}>
+            {latestInv?.conclusion?.verdict ? (
+              <VerdictTag verdict={latestInv.conclusion.verdict} />
+            ) : (
+              <Typography.Text type="secondary">{t("eventDetail.noSecurityVerdict")}</Typography.Text>
+            )}
+          </Descriptions.Item>
+          <Descriptions.Item label={t("eventDetail.riskScore")}>{data.risk_score}</Descriptions.Item>
+          <Descriptions.Item label={t("eventDetail.riskLevel")}>
+            {riskLevelLabel(latestInv?.conclusion?.risk_level)}
+          </Descriptions.Item>
+          <Descriptions.Item label={t("eventDetail.analystPriority")}>
+            {data.queue_priority ?? "—"}
+            {latestInv?.conclusion?.disposition_grade && (
+              <>
+                {" · "}
+                <DispositionGradeTag grade={latestInv.conclusion.disposition_grade} />
+              </>
+            )}
+          </Descriptions.Item>
+          <Descriptions.Item label={t("eventDetail.evidenceStrength")}>
+            <EvidenceStrengthTag strength={latestInv?.conclusion?.evidence_strength} />
+          </Descriptions.Item>
           <Descriptions.Item label={t("eventDetail.host")}>{data.aggregate_host_name}</Descriptions.Item>
           <Descriptions.Item label={t("eventDetail.user")}>{data.aggregate_user_name}</Descriptions.Item>
-          <Descriptions.Item label={t("eventDetail.category")}>{data.primary_category || data.aggregate_category}</Descriptions.Item>
+          <Descriptions.Item label={t("eventDetail.category")}>
+            {data.primary_category || data.aggregate_category}
+          </Descriptions.Item>
           {(data.status === "concluded" || data.status === "closed") && latestInv?.finished_at && (
             <Descriptions.Item label={t("eventDetail.concludedAt")}>
               {latestInv.finished_at.slice(0, 19).replace("T", " ")}
@@ -216,22 +253,55 @@ export default function EventDetailPage() {
         )}
       </Card>
 
+      {latestInv?.status === "failed" && (
+        <Alert
+          type="error"
+          showIcon
+          message={t("eventDetail.opsFailureTitle")}
+          description={
+            latestInv.error_message ||
+            latestInv.failure_class ||
+            t("eventDetail.opsFailureBody")
+          }
+        />
+      )}
+
       {latestInv?.conclusion && (
         <Card title={t("eventDetail.agentConclusion")}>
+          {latestInv.conclusion.invalidated_as_ops_failure || !latestInv.conclusion.verdict ? (
+            <Alert
+              type="warning"
+              showIcon
+              message={t("eventDetail.verdictInvalidated")}
+              style={{ marginBottom: 12 }}
+            />
+          ) : null}
           <Typography.Paragraph>
-            <VerdictTag verdict={latestInv.conclusion.verdict} /> 置信度{" "}
-            {latestInv.conclusion.confidence}
-            {" "}
-            <DispositionGradeTag grade={latestInv.conclusion.disposition_grade} />
-            <EvidenceStrengthTag strength={latestInv.conclusion.evidence_strength} />
-            {latestInv.conclusion.closure_passed != null && (
-              <>
-                {" "}
+            <Space wrap>
+              <span>
+                {t("eventDetail.securityVerdict")}:{" "}
+                {latestInv.conclusion.verdict ? (
+                  <VerdictTag verdict={latestInv.conclusion.verdict} />
+                ) : (
+                  "—"
+                )}
+              </span>
+              <span>
+                {t("eventDetail.confidence")}: {latestInv.conclusion.confidence}
+              </span>
+              <span>
+                {t("eventDetail.riskLevel")}: {riskLevelLabel(latestInv.conclusion.risk_level)}
+              </span>
+              <DispositionGradeTag grade={latestInv.conclusion.disposition_grade} />
+              <EvidenceStrengthTag strength={latestInv.conclusion.evidence_strength} />
+              {latestInv.conclusion.closure_passed != null && (
                 <Tag color={latestInv.conclusion.closure_passed ? "green" : "orange"}>
-                  证据闭合 {latestInv.conclusion.closure_passed ? "通过" : "未通过"}
+                  {latestInv.conclusion.closure_passed
+                    ? t("eventDetail.closurePass")
+                    : t("eventDetail.closureFail")}
                 </Tag>
-              </>
-            )}
+              )}
+            </Space>
           </Typography.Paragraph>
           {verdictInfo && (
             <Alert

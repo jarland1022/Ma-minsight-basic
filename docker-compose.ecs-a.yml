@@ -1,0 +1,32 @@
+﻿# ECS-A: public HTTPS on 6443 (host 80/443 reserved for nginx-stream → ECS-B).
+#
+# Usage (must use ALL compose files — plain `docker compose up` drops 6443/HTTPS):
+#   # In .env:
+#   HTTP_PORT=8080
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml:docker-compose.ecs-a.yml
+#
+#   docker compose up -d --build
+#
+# Or explicitly:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.ecs-a.yml up -d --build
+#
+# HTTP_PORT=8080 maps 8080:80 (debug). This file adds 6443:443 for public HTTPS.
+# Place certs at deploy/nginx/certs/fullchain.pem and privkey.pem before start.
+
+services:
+  nginx:
+    ports:
+      - "6443:443"
+    volumes:
+      - ./deploy/nginx/certs:/etc/nginx/certs:ro
+      - ./deploy/nginx/ma-minsight.ssl.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1/health/ready >/dev/null 2>&1 || wget -qO- --no-check-certificate https://127.0.0.1/health/ready >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

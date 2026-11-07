@@ -1,12 +1,12 @@
-"""AbuseIPDB IP reputation provider."""
+"""AbuseIPDB IP reputation provider (via EgressGateway)."""
 
 from __future__ import annotations
 
 from typing import Any
 
-import httpx
-
 from app.db.enums import ThreatIntelVerdict
+from app.privacy.egress_gateway import EgressDeniedError, get_egress_gateway
+from app.privacy.types import ContentType, EgressChannel, EgressContext
 from app.threat_intel.schemas import IntelLookupResult
 
 
@@ -17,12 +17,22 @@ class AbuseIPDBProvider:
         self.api_key = api_key
         self.max_age_days = max_age_days
 
-    async def lookup_ip(self, ip: str, client: httpx.AsyncClient) -> IntelLookupResult | None:
-        response = await client.get(
-            "https://api.abuseipdb.com/api/v2/check",
-            headers={"Key": self.api_key, "Accept": "application/json"},
-            params={"ipAddress": ip, "maxAgeInDays": self.max_age_days},
-        )
+    async def lookup_ip(self, ip: str, client: Any = None) -> IntelLookupResult | None:
+        del client  # legacy signature; HTTP goes through EgressGateway
+        gateway = get_egress_gateway()
+        try:
+            response = await gateway.send(
+                channel=EgressChannel.TI,
+                method="GET",
+                url="https://api.abuseipdb.com/api/v2/check",
+                headers={"Key": self.api_key, "Accept": "application/json"},
+                params={"ipAddress": ip, "maxAgeInDays": self.max_age_days},
+                content_type=ContentType.QUERY_PARAMS,
+                context=EgressContext(),
+                timeout=30.0,
+            )
+        except EgressDeniedError:
+            raise
         if response.status_code == 429:
             return None
         response.raise_for_status()

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from app.agent.context import AlertBrief, EventBrief, InvestigationContext, PlaybookBrief, SopBrief
+from app.agent.context import AlertBrief, EventBrief, InvestigationContext, SopBrief
 from app.agent.prompts import build_system_prompt, build_user_prompt
 
 
@@ -41,16 +41,6 @@ def _ctx(*, simulation_enabled: bool) -> InvestigationContext:
                 "simulate_disposition",
             ],
         ),
-        playbooks=[
-            PlaybookBrief(
-                id="inv-brute-force-auth",
-                name="暴力破解 / 认证失败复核",
-                summary="区分爆破与扫描噪音",
-                mitre_attack=["T1110"],
-                investigation_steps=["确认源 IP 归属"],
-                runtime_skills=["query_asset"],
-            )
-        ],
         disposition_simulation_enabled=simulation_enabled,
     )
 
@@ -74,24 +64,6 @@ def test_prompt_omits_hypothesis_when_disabled() -> None:
     assert "假设模板" not in prompt
 
 
-def test_prompt_includes_matched_playbook() -> None:
-    prompt = build_system_prompt(_ctx(simulation_enabled=False))
-    assert "防御调查剧本" in prompt
-    assert "inv-brute-force-auth" in prompt
-    assert "T1110" in prompt
-
-
 def test_user_prompt_reminds_simulation_when_enabled() -> None:
     prompt = build_user_prompt(_ctx(simulation_enabled=True))
     assert "simulate_disposition" in prompt
-
-
-def test_prompt_includes_methodology_and_timeline() -> None:
-    prompt = build_system_prompt(_ctx(simulation_enabled=False))
-    assert "五步研判流程" in prompt
-    assert "四路证据交叉验证" in prompt
-    assert "防幻觉校验清单" in prompt
-    assert "query_behavior_timeline" in prompt
-    assert "multi_path" in prompt
-    user = build_user_prompt(_ctx(simulation_enabled=False))
-    assert "query_behavior_timeline" in user

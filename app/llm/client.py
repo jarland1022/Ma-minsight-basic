@@ -1,4 +1,4 @@
-"""LLM client with chat completions and native tool calling."""
+"""LLM client with chat completions and native tool calling (via EgressGateway)."""
 
 from __future__ import annotations
 
@@ -7,11 +7,11 @@ import logging
 import re
 from typing import Any
 
-import httpx
-
 from app.core.config import settings
 from app.core.redis import get_redis
 from app.llm.schemas import ChatCompletionResult, TokenUsage, ToolCallRequest
+from app.privacy.egress_gateway import EgressDeniedError, get_egress_gateway
+from app.privacy.types import ContentType, EgressChannel, EgressContext
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ class LLMClient:
         tool_choice: str | None = "auto",
         model: str | None = None,
         temperature: float = 0.0,
+        egress_context: EgressContext | None = None,
     ) -> ChatCompletionResult:
         if not self.api_key:
             raise RuntimeError("DEEPSEEK_API_KEY is not configured")
@@ -45,14 +46,26 @@ class LLMClient:
             payload["tools"] = tools
             payload["tool_choice"] = tool_choice
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(
-                f"{self.base_url}/chat/completions",
+        gateway = get_egress_gateway()
+        url = f"{self.base_url}/chat/completions"
+        try:
+            response = await gateway.send(
+                channel=EgressChannel.LLM,
+                method="POST",
+                url=url,
                 headers={"Authorization": f"Bearer {self.api_key}"},
-                json=payload,
+                json_body=payload,
+                content_type=ContentType.CHAT_MESSAGES,
+                context=egress_context or EgressContext(),
+                timeout=120.0,
             )
             response.raise_for_status()
             data = response.json()
+        except EgressDeniedError:
+            raise
+        except Exception as exc:
+            # Do not retry with unprotected payload
+            raise RuntimeError(f"LLM egress failed: {exc}") from exc
 
         choice = data["choices"][0]
         message = choice.get("message") or {}
@@ -85,8 +98,11 @@ class LLMClient:
             raw_message=message,
         )
 
-    async def complete(self, prompt: str) -> str:
-        result = await self.chat(messages=[{"role": "user", "content": prompt}])
+    async def complete(self, prompt: str, *, egress_context: EgressContext | None = None) -> str:
+        result = await self.chat(
+            messages=[{"role": "user", "content": prompt}],
+            egress_context=egress_context,
+        )
         return result.content or ""
 
     @staticmethod

@@ -100,6 +100,20 @@ CONFIG_DESCRIPTIONS_ZH: dict[str, str] = {
     "tools.gateway_enabled": "是否启用统一工具网关",
     "tools.gateway_timeout_seconds": "工具网关 HTTP 超时（秒）",
     "tools.gateway_audit_all_calls": "是否审计所有网关调用",
+    # P0-06 privacy
+    "privacy.strict_mode": "严格隐私模式（禁用明文 PII / embed，要求 LLM URL allowlist）",
+    "privacy.llm_egress_enabled": "是否允许 LLM 外发（仍需 API Key；经 EgressGateway）",
+    "privacy.ti_egress_enabled": "是否允许威胁情报外发（仍需厂商 Key）",
+    "privacy.wecom_egress_enabled": "是否允许企业微信协查外发",
+    "privacy.embed_egress_enabled": "是否允许 Embedding API 外发（默认关闭）",
+    "privacy.webhook_egress_enabled": "是否允许 Eval/告警 Webhook 外发",
+    "privacy.llm.allow_public_ip_plaintext": "LLM 是否允许公网 IP 明文（默认否）",
+    "privacy.llm.allow_username_plaintext": "LLM 是否允许用户名明文（默认否）",
+    "privacy.llm.allow_hostname_plaintext": "LLM 是否允许主机名明文（默认否）",
+    "privacy.llm.allow_full_url": "LLM 是否允许完整 URL（默认否）",
+    "privacy.wecom.allow_host_user": "WeCom 是否允许主机/用户明文（默认否）",
+    "privacy.allowed_llm_base_urls": "严格模式下允许的 LLM base URL 列表",
+    "privacy.policy_version": "外发策略版本号",
 }
 
 

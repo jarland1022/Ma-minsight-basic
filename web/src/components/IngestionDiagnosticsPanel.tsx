@@ -44,6 +44,7 @@ function formatTs(iso: string | null | undefined): string {
 }
 
 function CheckItem({ check }: { check: DiagnosticCheck }) {
+  const { t } = useI18n();
   return (
     <div style={{ marginBottom: 12 }}>
       <Space align="start">

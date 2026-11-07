@@ -388,3 +388,228 @@ body,
 .ms-main .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
   color: var(--hs-blue-deep);
 }
+
+/* —— ATT&CK coverage board (Playbooks) —— */
+.ms-atk-board {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+  align-items: stretch;
+}
+
+.ms-atk-col {
+  min-width: 108px;
+  max-width: 128px;
+  flex: 1 0 108px;
+  background: #fafbfc;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+}
+
+.ms-atk-col-head {
+  padding: 0.45rem 0.4rem 0.35rem;
+  border-bottom: 1px solid var(--line);
+  background: #f3f6fa;
+}
+
+.ms-atk-col-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--hs-blue-deep);
+  line-height: 1.25;
+}
+
+.ms-atk-col-sub {
+  margin-top: 0.15rem;
+  font-size: 0.65rem;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.ms-atk-col-body {
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.ms-atk-gap {
+  font-size: 0.7rem;
+  color: var(--muted);
+  padding: 0.35rem 0.2rem;
+}
+
+.ms-atk-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 0.22rem 0.35rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.68rem;
+  line-height: 1.2;
+}
+
+.ms-atk-cell.empty {
+  background: #f0f0f0;
+  color: #999;
+  cursor: default;
+}
+
+.ms-atk-cell.low {
+  background: #e8f2fb;
+  color: var(--hs-blue);
+  border-color: #c5daf0;
+}
+
+.ms-atk-cell.mid {
+  background: #cfe3f7;
+  color: var(--hs-blue-deep);
+  border-color: #9fc4e8;
+}
+
+.ms-atk-cell.hot {
+  background: #1a6db5;
+  color: #fff;
+  border-color: #0b4f8a;
+}
+
+.ms-atk-cell.active {
+  outline: 2px solid #faad14;
+  outline-offset: 1px;
+}
+
+.ms-atk-cell.legend {
+  display: inline-flex;
+  width: auto;
+  cursor: default;
+  padding: 0.15rem 0.45rem;
+}
+
+.ms-atk-id {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ms-atk-n {
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
+.ms-atk-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* —— Morning note —— */
+.ms-morning-toolbar {
+  margin-bottom: 0.75rem;
+}
+
+.ms-morning-card {
+  max-width: 920px;
+}
+
+.ms-morning-meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.45;
+}
+
+.ms-morning-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.ms-morning-stats > div {
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.35rem;
+  background: #fff;
+}
+
+.ms-morning-stats .num {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--hs-blue);
+}
+
+.ms-morning-stats .label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+.ms-morning-case {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.65rem;
+  background: #fff;
+}
+
+.ms-morning-case-meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0.35rem 0 0.45rem;
+}
+
+.ms-morning-q {
+  background: #fff8e6;
+  border-radius: 3px;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 800px) {
+  .ms-morning-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media print {
+  .no-print,
+  .ms-header,
+  .ms-sidebar,
+  .ms-crumb,
+  .ms-morning-toolbar {
+    display: none !important;
+  }
+
+  .ms-body {
+    display: block;
+  }
+
+  .ms-main {
+    padding: 0;
+    overflow: visible;
+    background: #fff;
+  }
+
+  .ms-morning-card.ant-card {
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .ms-morning-stats {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}

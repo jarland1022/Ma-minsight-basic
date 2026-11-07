@@ -1,0 +1,8 @@
+# Local-only port publish for host-side integration tests. Do not use in production.
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+  redis:
+    ports:
+      - "6379:6379"

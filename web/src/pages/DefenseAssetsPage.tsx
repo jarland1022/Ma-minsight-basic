@@ -4,10 +4,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import UserGuidePanel from "../components/UserGuidePanel";
+import { useMe } from "../hooks/useMe";
+import { useI18n } from "../i18n/I18nProvider";
 import { PAGE_GUIDES } from "../content/userGuide";
 import type { PendingDispositionRow, PendingSimulationRow } from "../types/api";
 
 export default function DefenseAssetsPage() {
+  const { t } = useI18n();
+  const { data: me } = useMe();
+  const isReadonly = Boolean(me?.is_readonly);
   const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ["pending"],
@@ -96,6 +101,9 @@ export default function DefenseAssetsPage() {
         message="本页所有「确认 / 批准」按钮都不会自动执行封禁或隔离"
         description="它们仅用于记录您已审阅 AI 建议。真实处置请在防火墙、WAF、主机安全等产品中由运维操作。"
       />
+      {isReadonly && (
+        <Alert type="info" showIcon message={t("pilots.writeDisabled")} />
+      )}
       <Card title="白名单候选（≥3 次确认升格 active 规则）">
         <Typography.Paragraph type="secondary">
           当 AI 多次判断某类告警为误报时，会建议加入白名单。您每点一次「确认」计一次；满 3 次后系统自动生成白名单规则，减少同类告警打扰。
@@ -105,7 +113,11 @@ export default function DefenseAssetsPage() {
           renderItem={(item: { id: string; human_confirmations: number; reason: string }) => (
             <List.Item
               actions={[
-                <Button key="c" onClick={() => confirmWl.mutate(item.id)}>
+                <Button
+                  key="c"
+                  disabled={isReadonly}
+                  onClick={() => confirmWl.mutate(item.id)}
+                >
                   确认 ({item.human_confirmations}/3)
                 </Button>,
               ]}
@@ -123,7 +135,11 @@ export default function DefenseAssetsPage() {
           renderItem={(item: { id: string; suggested_changes: { content?: string } }) => (
             <List.Item
               actions={[
-                <Button key="a" onClick={() => applyProfile.mutate(item.id)}>
+                <Button
+                  key="a"
+                  disabled={isReadonly}
+                  onClick={() => applyProfile.mutate(item.id)}
+                >
                   批准
                 </Button>,
               ]}
@@ -209,6 +225,7 @@ export default function DefenseAssetsPage() {
                   <Button
                     type="primary"
                     size="small"
+                    disabled={isReadonly}
                     loading={confirmDisp.isPending && confirmDisp.variables === row.id}
                     onClick={() => confirmDisp.mutate(row.id)}
                   >
@@ -216,6 +233,7 @@ export default function DefenseAssetsPage() {
                   </Button>
                   <Button
                     size="small"
+                    disabled={isReadonly}
                     loading={rejectDisp.isPending && rejectDisp.variables === row.id}
                     onClick={() => rejectDisp.mutate(row.id)}
                   >
@@ -297,6 +315,7 @@ export default function DefenseAssetsPage() {
                   <Button
                     type="primary"
                     size="small"
+                    disabled={isReadonly}
                     loading={approveSim.isPending && approveSim.variables === row.id}
                     onClick={() => approveSim.mutate(row.id)}
                   >
@@ -304,6 +323,7 @@ export default function DefenseAssetsPage() {
                   </Button>
                   <Button
                     size="small"
+                    disabled={isReadonly}
                     loading={rejectSim.isPending && rejectSim.variables === row.id}
                     onClick={() => rejectSim.mutate(row.id)}
                   >

@@ -1,6 +1,5 @@
 ﻿import { useMemo, type ReactNode } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import {
   DashboardOutlined,
   ClusterOutlined,
@@ -11,9 +10,13 @@ import {
   QuestionCircleOutlined,
   BookOutlined,
   KeyOutlined,
+  FileTextOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
-import { api, logout } from "../api/client";
+import { Alert } from "antd";
+import { logout } from "../api/client";
 import LanguageSwitch from "../components/LanguageSwitch";
+import { useMe } from "../hooks/useMe";
 import { useI18n } from "../i18n/I18nProvider";
 
 type NavChild = {
@@ -28,44 +31,44 @@ type NavModule = {
   children: NavChild[];
 };
 
-function useModules(): NavModule[] {
+function useModules(isAdmin: boolean, isReadonly: boolean): NavModule[] {
   const { t } = useI18n();
-  return useMemo(
-    () => [
+  return useMemo(() => {
+    const reviewChildren = [
+      { path: "/events", label: t("nav.events"), icon: <ClusterOutlined /> },
+      { path: "/human-review", label: t("nav.humanReview"), icon: <MessageOutlined /> },
+      { path: "/playbooks", label: t("nav.playbooks"), icon: <BookOutlined /> },
+    ];
+    const defenseChildren = [
+      { path: "/defense-assets", label: t("nav.defenseAssets"), icon: <SafetyOutlined /> },
+    ];
+    const systemChildren = [
+      { path: "/guide", label: t("nav.guide"), icon: <QuestionCircleOutlined /> },
+      ...(!isReadonly
+        ? [
+            { path: "/eval", label: t("nav.eval"), icon: <ExperimentOutlined /> },
+            { path: "/license", label: t("nav.license"), icon: <KeyOutlined /> },
+            { path: "/settings", label: t("nav.settings"), icon: <SettingOutlined /> },
+          ]
+        : []),
+      ...(isAdmin
+        ? [{ path: "/pilot-accounts", label: t("nav.pilots"), icon: <TeamOutlined /> }]
+        : []),
+    ];
+    return [
       {
         key: "home",
         label: t("nav.home"),
-        children: [{ path: "/", label: t("nav.dashboard"), icon: <DashboardOutlined /> }],
-      },
-      {
-        key: "review",
-        label: t("nav.review"),
         children: [
-          { path: "/events", label: t("nav.events"), icon: <ClusterOutlined /> },
-          { path: "/human-review", label: t("nav.humanReview"), icon: <MessageOutlined /> },
-          { path: "/playbooks", label: t("nav.playbooks"), icon: <BookOutlined /> },
+          { path: "/", label: t("nav.dashboard"), icon: <DashboardOutlined /> },
+          { path: "/morning-note", label: t("nav.morningNote"), icon: <FileTextOutlined /> },
         ],
       },
-      {
-        key: "defense",
-        label: t("nav.defense"),
-        children: [
-          { path: "/defense-assets", label: t("nav.defenseAssets"), icon: <SafetyOutlined /> },
-        ],
-      },
-      {
-        key: "system",
-        label: t("nav.system"),
-        children: [
-          { path: "/guide", label: t("nav.guide"), icon: <QuestionCircleOutlined /> },
-          { path: "/eval", label: t("nav.eval"), icon: <ExperimentOutlined /> },
-          { path: "/license", label: t("nav.license"), icon: <KeyOutlined /> },
-          { path: "/settings", label: t("nav.settings"), icon: <SettingOutlined /> },
-        ],
-      },
-    ],
-    [t],
-  );
+      { key: "review", label: t("nav.review"), children: reviewChildren },
+      { key: "defense", label: t("nav.defense"), children: defenseChildren },
+      { key: "system", label: t("nav.system"), children: systemChildren },
+    ];
+  }, [t, isAdmin, isReadonly]);
 }
 
 function matchModule(
@@ -97,41 +100,21 @@ export default function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useI18n();
-  const modules = useModules();
+  const { data: me } = useMe();
+  const isAdmin = Boolean(me?.is_admin);
+  const isReadonly = Boolean(me?.is_readonly);
+  const modules = useModules(isAdmin, isReadonly);
   const { module, child } = useMemo(
     () => matchModule(location.pathname, modules),
     [location.pathname, modules],
   );
-
-  const { data: me } = useQuery({
-    queryKey: ["auth-me"],
-    queryFn: async () => (await api.get("/auth/me")).data,
-  });
-
-  const { data: licenseData } = useQuery({
-    queryKey: ["license-status"],
-    queryFn: async () =>
-      (await api.get("/license/status")).data as {
-        edition?: string;
-        pro_enabled?: boolean;
-        license: { status: string; hint?: string; days_remaining?: number };
-      },
-    refetchInterval: 60_000,
-  });
-  const lic = licenseData?.license;
-  const proEnabled = Boolean(licenseData?.pro_enabled);
-  const showLicenseBanner = Boolean(lic && lic.status !== "active");
-  const bannerTone =
-    lic?.status === "community" || lic?.status === "no_license" ? "warn" : "error";
 
   return (
     <div className="ms-shell">
       <header className="ms-header">
         <Link to="/" className="ms-header-brand">
           <span className="ms-header-logo">{t("brand.product")}</span>
-          <span className="ms-header-model">
-            {proEnabled ? t("brand.pro") : t("brand.community")}
-          </span>
+          <span className="ms-header-model">{t("brand.pro")}</span>
         </Link>
         <nav className="ms-topnav" aria-label="Main">
           {modules.map((mod) => (
@@ -148,6 +131,7 @@ export default function AppLayout() {
         <div className="ms-header-right">
           <LanguageSwitch />
           {me?.username && <span className="ms-chip">{me.username}</span>}
+          {isReadonly && <span className="ms-chip">{t("pilots.readonlyBadge")}</span>}
           <Link className="ms-header-link" to="/guide">
             {t("common.guide")}
           </Link>
@@ -182,15 +166,17 @@ export default function AppLayout() {
         </aside>
 
         <main className="ms-main">
-          {showLicenseBanner && lic && (
-            <div className={`ms-license-banner ${bannerTone}`} role="status">
-              <span>
-                {lic.status === "community"
-                  ? t("license.bannerCommunity")
-                  : lic.hint || t("license.bannerStatus", { status: lic.status })}
-              </span>
-              <Link to="/license">{t("license.goLicense")}</Link>
-            </div>
+          {isReadonly && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message={t("pilots.readonlyBanner", {
+                expires: me?.expires_at
+                  ? me.expires_at.slice(0, 19).replace("T", " ")
+                  : "—",
+              })}
+            />
           )}
           <div className="ms-crumb">
             {module.label} / {child.label}

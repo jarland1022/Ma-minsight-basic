@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_auth
+from app.api.deps import require_auth, require_write
 from app.db.enums import InvestigationVerdict
 from app.db.session import get_async_session
 from app.human_review.audit_sampler import AuditSampleService
@@ -28,7 +28,7 @@ class AuditReviewRequest(BaseModel):
     feedback: str | None = None
 
 
-@router.post("/run", response_model=AuditSampleRunResponse, dependencies=[Depends(require_auth)])
+@router.post("/run", response_model=AuditSampleRunResponse, dependencies=[Depends(require_write)])
 async def run_audit_samples(
     limit: int = Query(default=50, ge=1, le=200),
     session: AsyncSession = Depends(get_async_session),
@@ -42,7 +42,7 @@ async def run_audit_samples(
     )
 
 
-@router.post("/{sample_id}/review", dependencies=[Depends(require_auth)])
+@router.post("/{sample_id}/review", dependencies=[Depends(require_write)])
 async def submit_audit_review(
     sample_id: UUID,
     body: AuditReviewRequest,

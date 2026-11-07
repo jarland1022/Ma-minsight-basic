@@ -5,9 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import dataclass
-from app.core.datetime_utils import utc_now
-
+from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import ValidationError
@@ -15,12 +13,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.skills.bootstrap  # noqa: F401 — register skills
 from app.agent.closure_evaluator import ClosureConfig, ClosureEvaluator
-from app.agent.conclusion import ConclusionPayload, degraded_conclusion, parse_conclusion
+from app.agent.conclusion import ConclusionPayload, parse_conclusion, security_incomplete_conclusion
 from app.agent.config import InvestigationConfig
 from app.agent.context import InvestigationContext
+from app.agent.failure import classify_llm_error, classify_skill_error, rejects_deterministic_verdict
 from app.agent.prompts import build_initial_messages
+from app.core.datetime_utils import utc_now
+from app.db.enums import InvestigationFailureClass, InvestigationStatus, InvestigationVerdict, MessageRole
 from app.defense_assets.disposition.config import load_disposition_config
-from app.db.enums import InvestigationStatus, MessageRole
 from app.llm.client import LLMClient
 from app.models.investigation import Investigation, InvestigationMessage, InvestigationToolCall
 from app.skills.registry import SkillRegistry
@@ -31,10 +31,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AgentLoopResult:
-    conclusion: ConclusionPayload
     investigation_status: InvestigationStatus
+    conclusion: ConclusionPayload | None = None
     closure_result: Any | None = None
     skills_called: set[str] | None = None
+    failure_class: str | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+    missing_evidence: list[str] = field(default_factory=list)
+    failed_required_skills: set[str] = field(default_factory=set)
+    is_ops_failure: bool = False
 
 
 class AgentLoop:
@@ -56,6 +62,9 @@ class AgentLoop:
         sequence = 0
         skill_calls = 0
         skills_called: set[str] = set()
+        missing_evidence: list[str] = []
+        failed_required_skills: set[str] = set()
+        recommended = set(ctx.sop.recommended_skills or []) if ctx.sop else set()
 
         await self._save_message(session, investigation.id, sequence, MessageRole.SYSTEM, messages[0]["content"])
         sequence += 1
@@ -65,15 +74,31 @@ class AgentLoop:
         for step in range(1, config.max_steps + 1):
             investigation.current_step = step
             try:
+                from app.privacy.types import EgressContext
+
                 response = await self.llm.chat(
                     messages=messages,
                     tools=tools,
                     model=ctx.model_name,
+                    egress_context=EgressContext(
+                        investigation_id=str(investigation.id),
+                        event_id=str(investigation.event_id) if investigation.event_id else None,
+                    ),
                 )
             except Exception as exc:
                 logger.exception("LLM call failed at step %s", step)
-                conclusion = degraded_conclusion(f"LLM error: {exc}")
-                return AgentLoopResult(conclusion=conclusion, investigation_status=InvestigationStatus.DEGRADED)
+                failure_class, error_code = classify_llm_error(exc)
+                return AgentLoopResult(
+                    investigation_status=InvestigationStatus.FAILED,
+                    conclusion=None,
+                    skills_called=skills_called,
+                    failure_class=failure_class,
+                    error_code=error_code,
+                    error_message=f"LLM error: {exc}",
+                    missing_evidence=missing_evidence,
+                    failed_required_skills=failed_required_skills,
+                    is_ops_failure=True,
+                )
 
             investigation.token_input = (investigation.token_input or 0) + response.usage.prompt_tokens
             investigation.token_output = (investigation.token_output or 0) + response.usage.completion_tokens
@@ -109,6 +134,28 @@ class AgentLoop:
                     if call.name == SUBMIT_CONCLUSION_NAME:
                         try:
                             conclusion = parse_conclusion(call.arguments)
+                            if rejects_deterministic_verdict(
+                                conclusion.verdict,
+                                failed_required_skills=failed_required_skills,
+                            ):
+                                err = (
+                                    "submit_conclusion rejected: deterministic verdict requires "
+                                    f"successful required skills; failed={sorted(failed_required_skills)}"
+                                )
+                                messages.append(
+                                    {"role": "tool", "tool_call_id": call.id, "content": err},
+                                )
+                                await self._save_message(
+                                    session,
+                                    investigation.id,
+                                    sequence,
+                                    MessageRole.TOOL,
+                                    err,
+                                    tool_call_id=call.id,
+                                )
+                                sequence += 1
+                                continue
+
                             closure_cfg = ClosureConfig(
                                 enabled=config.closure_enabled,
                                 min_evidence_closure_score=config.min_evidence_closure_score,
@@ -136,7 +183,7 @@ class AgentLoop:
                                     investigation.closure_retry_count
                                     > config.max_closure_retries
                                 ):
-                                    conclusion = degraded_conclusion(
+                                    conclusion = security_incomplete_conclusion(
                                         "证据闭合度不足且已达最大补查次数，转人工复核。"
                                     )
                                     investigation.skill_call_count = skill_calls
@@ -145,6 +192,12 @@ class AgentLoop:
                                         investigation_status=InvestigationStatus.NEEDS_HUMAN,
                                         closure_result=closure_result,
                                         skills_called=skills_called,
+                                        failure_class=(
+                                            InvestigationFailureClass.SECURITY_EVIDENCE_INSUFFICIENT.value
+                                        ),
+                                        missing_evidence=missing_evidence,
+                                        failed_required_skills=failed_required_skills,
+                                        is_ops_failure=False,
                                     )
                                 err = closure_result.rejection_message()
                                 messages.append(
@@ -166,6 +219,9 @@ class AgentLoop:
                                 investigation_status=InvestigationStatus.COMPLETED,
                                 closure_result=closure_result,
                                 skills_called=skills_called,
+                                missing_evidence=missing_evidence,
+                                failed_required_skills=failed_required_skills,
+                                is_ops_failure=False,
                             )
                         except ValidationError as exc:
                             err = f"submit_conclusion validation failed: {exc}"
@@ -186,10 +242,17 @@ class AgentLoop:
                     skill_calls += 1
                     skills_called.add(call.name)
                     if skill_calls > config.max_skill_calls:
-                        conclusion = degraded_conclusion("max_skill_calls exceeded")
+                        conclusion = security_incomplete_conclusion("max_skill_calls exceeded")
                         return AgentLoopResult(
                             conclusion=conclusion,
                             investigation_status=InvestigationStatus.NEEDS_HUMAN,
+                            skills_called=skills_called,
+                            failure_class=(
+                                InvestigationFailureClass.SECURITY_EVIDENCE_INSUFFICIENT.value
+                            ),
+                            missing_evidence=missing_evidence,
+                            failed_required_skills=failed_required_skills,
+                            is_ops_failure=False,
                         )
 
                     result = await self._execute_skill_with_retry(
@@ -201,7 +264,39 @@ class AgentLoop:
                         ctx,
                         config.skill_max_retries,
                     )
-                    tool_content = result.summary if result.success else f"Skill error: {result.error or result.summary}"
+                    if not result.success:
+                        required = call.name in recommended
+                        skill_class = classify_skill_error(result.error or result.summary, required=required)
+                        note = f"skill:{call.name}:{skill_class}"
+                        if note not in missing_evidence:
+                            missing_evidence.append(note)
+                        if required:
+                            failed_required_skills.add(call.name)
+                            # Required skill hard-fail after retries → ops failure (do not HR)
+                            if skill_class in {
+                                InvestigationFailureClass.REQUIRED_SKILL.value,
+                                InvestigationFailureClass.DATASOURCE.value,
+                            }:
+                                investigation.skill_call_count = skill_calls
+                                return AgentLoopResult(
+                                    investigation_status=InvestigationStatus.FAILED,
+                                    conclusion=None,
+                                    skills_called=skills_called,
+                                    failure_class=skill_class,
+                                    error_code="required_skill_failed",
+                                    error_message=(
+                                        f"Required skill failed: {call.name}: "
+                                        f"{result.error or result.summary}"
+                                    ),
+                                    missing_evidence=missing_evidence,
+                                    failed_required_skills=failed_required_skills,
+                                    is_ops_failure=True,
+                                )
+                        # Optional skill failure: continue investigation with missing evidence marked
+
+                    tool_content = (
+                        result.summary if result.success else f"Skill error: {result.error or result.summary}"
+                    )
                     messages.append({"role": "tool", "tool_call_id": call.id, "content": tool_content})
                     await self._save_message(
                         session,
@@ -240,8 +335,16 @@ class AgentLoop:
                 sequence += 1
 
         investigation.skill_call_count = skill_calls
-        conclusion = degraded_conclusion("max_steps exceeded without submit_conclusion")
-        return AgentLoopResult(conclusion=conclusion, investigation_status=InvestigationStatus.NEEDS_HUMAN)
+        conclusion = security_incomplete_conclusion("max_steps exceeded without submit_conclusion")
+        return AgentLoopResult(
+            conclusion=conclusion,
+            investigation_status=InvestigationStatus.NEEDS_HUMAN,
+            skills_called=skills_called,
+            failure_class=InvestigationFailureClass.SECURITY_EVIDENCE_INSUFFICIENT.value,
+            missing_evidence=missing_evidence,
+            failed_required_skills=failed_required_skills,
+            is_ops_failure=False,
+        )
 
     async def _execute_skill_with_retry(
         self,

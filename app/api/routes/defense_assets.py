@@ -4,25 +4,28 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_auth, require_pro_license
-from app.services.auth import AuthContext
+from app.api.audit_helpers import security_audit
+from app.api.deps import assert_pipeline_permission, require_auth, require_write
+from app.services.pipeline_audit import begin_pipeline_audit, finalize_pipeline_audit
 from app.db.enums import CandidateStatus, DispositionSimulationApprovalStatus
 from app.db.session import get_async_session
+from app.defense_assets.config import load_defense_asset_config
 from app.defense_assets.disposition.service import DispositionService
 from app.defense_assets.disposition.simulation_service import DispositionSimulationService
 from app.defense_assets.pipeline import AssetPipeline
 from app.defense_assets.profile.applier import ProfileUpdateApplier
 from app.defense_assets.whitelist.promoter import WhitelistPromoter
-from app.defense_assets.config import load_defense_asset_config
 from app.models.defense_assets import DispositionRecord, DispositionSimulation, JudgmentCase, RuleCandidate
 from app.models.triage import WhitelistRule
+from app.services.audit import AuditResult
+from app.services.auth import AuthContext
 
-router = APIRouter(tags=["defense-assets"], dependencies=[Depends(require_pro_license)])
+router = APIRouter(tags=["defense-assets"])
 
 
 class PipelineRunResponse(BaseModel):
@@ -43,14 +46,36 @@ class RuleReviewRequest(BaseModel):
 @router.post(
     "/api/v1/defense-assets/run",
     response_model=PipelineRunResponse,
-    dependencies=[Depends(require_auth)],
 )
 async def run_defense_assets(
+    request: Request,
     limit: int = Query(default=20, ge=1, le=100),
+    auth: AuthContext = Depends(require_write),
     session: AsyncSession = Depends(get_async_session),
 ) -> PipelineRunResponse:
-    pipeline = AssetPipeline(session)
-    result = await pipeline.run(limit=limit, use_lock=True)
+    assert_pipeline_permission(auth, "defense_assets")
+    started = await begin_pipeline_audit(
+        session,
+        request,
+        auth,
+        pipeline="defense_assets",
+        detail={"limit": limit, "source": "defense-assets/run"},
+    )
+    try:
+        pipeline = AssetPipeline(session)
+        result = await pipeline.run(limit=limit, use_lock=True)
+    except Exception as exc:
+        await finalize_pipeline_audit(started.id, success=False, error=str(exc))
+        raise
+    await finalize_pipeline_audit(
+        started.id,
+        success=True,
+        result_detail={
+            "processed": result.processed,
+            "skipped_lock": result.skipped_lock,
+            "errors": result.errors[:20],
+        },
+    )
     return PipelineRunResponse(
         processed=result.processed,
         skipped_lock=result.skipped_lock,
@@ -108,14 +133,27 @@ async def get_judgment_case(
     }
 
 
-@router.post("/api/v1/whitelist-candidates/{candidate_id}/confirm", dependencies=[Depends(require_auth)])
+@router.post("/api/v1/whitelist-candidates/{candidate_id}/confirm")
 async def confirm_whitelist_candidate(
     candidate_id: UUID,
+    request: Request,
+    auth: AuthContext = Depends(require_write),
     session: AsyncSession = Depends(get_async_session),
 ) -> dict:
     config = await load_defense_asset_config(session)
     promoter = WhitelistPromoter(session, config)
     rule = await promoter.confirm_candidate(candidate_id)
+    await security_audit(
+        session,
+        request,
+        auth,
+        action="whitelist.candidate.confirm",
+        resource_type="whitelist_candidate",
+        resource_id=candidate_id,
+        detail={"promoted": rule is not None, "rule_id": str(rule.id) if rule else None},
+        result=AuditResult.SUCCESS,
+        commit=False,
+    )
     await session.commit()
     return {
         "promoted": rule is not None,
@@ -123,9 +161,11 @@ async def confirm_whitelist_candidate(
     }
 
 
-@router.post("/api/v1/whitelist-candidates/{candidate_id}/reject", dependencies=[Depends(require_auth)])
+@router.post("/api/v1/whitelist-candidates/{candidate_id}/reject")
 async def reject_whitelist_candidate(
     candidate_id: UUID,
+    request: Request,
+    auth: AuthContext = Depends(require_write),
     session: AsyncSession = Depends(get_async_session),
 ) -> dict:
     config = await load_defense_asset_config(session)
@@ -133,32 +173,67 @@ async def reject_whitelist_candidate(
     ok = await promoter.reject_candidate(candidate_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
+    await security_audit(
+        session,
+        request,
+        auth,
+        action="whitelist.candidate.reject",
+        resource_type="whitelist_candidate",
+        resource_id=candidate_id,
+        result=AuditResult.SUCCESS,
+        commit=False,
+    )
     await session.commit()
     return {"rejected": True}
 
 
-@router.post("/api/v1/profile-suggestions/{suggestion_id}/apply", dependencies=[Depends(require_auth)])
+@router.post("/api/v1/profile-suggestions/{suggestion_id}/apply")
 async def apply_profile_suggestion(
     suggestion_id: UUID,
+    request: Request,
+    auth: AuthContext = Depends(require_write),
     session: AsyncSession = Depends(get_async_session),
 ) -> dict:
     applier = ProfileUpdateApplier(session)
     memory = await applier.apply(suggestion_id)
     if memory is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Suggestion not found")
+    await security_audit(
+        session,
+        request,
+        auth,
+        action="profile.suggestion.apply",
+        resource_type="profile_suggestion",
+        resource_id=suggestion_id,
+        detail={"memory_id": str(memory.id)},
+        result=AuditResult.SUCCESS,
+        commit=False,
+    )
     await session.commit()
     return {"applied": True, "memory_id": str(memory.id)}
 
 
-@router.post("/api/v1/profile-suggestions/{suggestion_id}/reject", dependencies=[Depends(require_auth)])
+@router.post("/api/v1/profile-suggestions/{suggestion_id}/reject")
 async def reject_profile_suggestion(
     suggestion_id: UUID,
+    request: Request,
+    auth: AuthContext = Depends(require_write),
     session: AsyncSession = Depends(get_async_session),
 ) -> dict:
     applier = ProfileUpdateApplier(session)
     ok = await applier.reject(suggestion_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Suggestion not found")
+    await security_audit(
+        session,
+        request,
+        auth,
+        action="profile.suggestion.reject",
+        resource_type="profile_suggestion",
+        resource_id=suggestion_id,
+        result=AuditResult.SUCCESS,
+        commit=False,
+    )
     await session.commit()
     return {"rejected": True}
 
@@ -180,10 +255,12 @@ async def list_rule_candidates(
     ]
 
 
-@router.post("/api/v1/rule-candidates/{candidate_id}/review", dependencies=[Depends(require_auth)])
+@router.post("/api/v1/rule-candidates/{candidate_id}/review")
 async def review_rule_candidate(
     candidate_id: UUID,
     body: RuleReviewRequest,
+    request: Request,
+    auth: AuthContext = Depends(require_write),
     session: AsyncSession = Depends(get_async_session),
 ) -> dict:
     candidate = await session.get(RuleCandidate, candidate_id)
@@ -191,16 +268,30 @@ async def review_rule_candidate(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
     if body.status not in (CandidateStatus.ACCEPTED, CandidateStatus.REJECTED):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status")
+    before = {"status": candidate.status.value}
     candidate.status = body.status
+    await security_audit(
+        session,
+        request,
+        auth,
+        action="rule.candidate.review",
+        resource_type="rule_candidate",
+        resource_id=candidate_id,
+        before=before,
+        after={"status": candidate.status.value},
+        result=AuditResult.SUCCESS,
+        commit=False,
+    )
     await session.commit()
     return {"status": candidate.status.value}
 
 
-@router.post("/api/v1/disposition/{record_id}/confirm", dependencies=[Depends(require_auth)])
+@router.post("/api/v1/disposition/{record_id}/confirm")
 async def confirm_disposition(
     record_id: UUID,
     body: DispositionConfirmRequest,
-    auth: AuthContext = Depends(require_auth),
+    request: Request,
+    auth: AuthContext = Depends(require_write),
     session: AsyncSession = Depends(get_async_session),
 ) -> dict:
     service = DispositionService(session)
@@ -211,19 +302,42 @@ async def confirm_disposition(
     )
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")
+    await security_audit(
+        session,
+        request,
+        auth,
+        action="disposition.confirm",
+        resource_type="disposition",
+        resource_id=record_id,
+        detail={"confirmed_action": body.confirmed_action, "status": record.status.value},
+        result=AuditResult.SUCCESS,
+        commit=False,
+    )
     await session.commit()
     return {"status": record.status.value}
 
 
-@router.post("/api/v1/disposition/{record_id}/reject", dependencies=[Depends(require_auth)])
+@router.post("/api/v1/disposition/{record_id}/reject")
 async def reject_disposition(
     record_id: UUID,
+    request: Request,
+    auth: AuthContext = Depends(require_write),
     session: AsyncSession = Depends(get_async_session),
 ) -> dict:
     service = DispositionService(session)
     ok = await service.reject(record_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")
+    await security_audit(
+        session,
+        request,
+        auth,
+        action="disposition.reject",
+        resource_type="disposition",
+        resource_id=record_id,
+        result=AuditResult.SUCCESS,
+        commit=False,
+    )
     await session.commit()
     return {"status": "rejected"}
 
@@ -241,35 +355,53 @@ async def list_disposition_simulations(
     return [_simulation_row(s) for s in result.scalars().all()]
 
 
-@router.post(
-    "/api/v1/disposition-simulations/{simulation_id}/approve",
-    dependencies=[Depends(require_auth)],
-)
+@router.post("/api/v1/disposition-simulations/{simulation_id}/approve")
 async def approve_disposition_simulation(
     simulation_id: UUID,
-    auth: AuthContext = Depends(require_auth),
+    request: Request,
+    auth: AuthContext = Depends(require_write),
     session: AsyncSession = Depends(get_async_session),
 ) -> dict:
     service = DispositionSimulationService(session)
     record = await service.approve(simulation_id, approved_by_id=auth.user_id)
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Simulation not found")
+    await security_audit(
+        session,
+        request,
+        auth,
+        action="disposition.simulation.approve",
+        resource_type="disposition_simulation",
+        resource_id=simulation_id,
+        after={"approval_status": record.approval_status.value},
+        result=AuditResult.SUCCESS,
+        commit=False,
+    )
     await session.commit()
     return {"approval_status": record.approval_status.value}
 
 
-@router.post(
-    "/api/v1/disposition-simulations/{simulation_id}/reject",
-    dependencies=[Depends(require_auth)],
-)
+@router.post("/api/v1/disposition-simulations/{simulation_id}/reject")
 async def reject_disposition_simulation(
     simulation_id: UUID,
+    request: Request,
+    auth: AuthContext = Depends(require_write),
     session: AsyncSession = Depends(get_async_session),
 ) -> dict:
     service = DispositionSimulationService(session)
     ok = await service.reject(simulation_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Simulation not found")
+    await security_audit(
+        session,
+        request,
+        auth,
+        action="disposition.simulation.reject",
+        resource_type="disposition_simulation",
+        resource_id=simulation_id,
+        result=AuditResult.SUCCESS,
+        commit=False,
+    )
     await session.commit()
     return {"approval_status": "rejected"}
 

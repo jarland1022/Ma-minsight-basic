@@ -219,7 +219,9 @@ class RegressionRunner:
                 expected_verdict=case.expected_verdict,
                 expected_skills=list(case.expected_skills or []),
                 forbidden_skills=list(case.forbidden_skills or []) if case.forbidden_skills else [],
-                actual_verdict=loop_result.conclusion.verdict,
+                actual_verdict=(
+                    loop_result.conclusion.verdict if loop_result.conclusion is not None else None
+                ),
                 actual_skills=actual_skills,
                 require_skills=not use_real_llm,
                 require_closure_pass=require_closure,

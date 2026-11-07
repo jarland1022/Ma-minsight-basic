@@ -63,3 +63,40 @@ export function eventStatusLabel(
   };
   return map[status] ?? status;
 }
+
+/** Investigation workflow status — independent from Event status and security verdict. */
+export function investigationStatusLabel(status: string | null | undefined): string {
+  if (!status) return "—";
+  const map: Record<string, string> = {
+    running: "Running",
+    completed: "Completed",
+    failed: "Failed",
+    needs_human: "Needs human",
+    degraded: "Degraded",
+  };
+  return map[status] ?? status;
+}
+
+export function InvestigationStatusTag({ status }: { status: string | null | undefined }) {
+  if (!status) return null;
+  const color =
+    status === "failed" || status === "degraded"
+      ? "red"
+      : status === "completed"
+        ? "green"
+        : status === "needs_human"
+          ? "orange"
+          : "blue";
+  return <Tag color={color}>{investigationStatusLabel(status)}</Tag>;
+}
+
+export function riskLevelLabel(level: string | null | undefined): string {
+  if (!level) return "—";
+  const map: Record<string, string> = {
+    critical: "Critical",
+    high: "High",
+    medium: "Medium",
+    low: "Low",
+  };
+  return map[level] ?? level;
+}

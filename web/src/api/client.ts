@@ -46,9 +46,54 @@ export function logout() {
   window.location.href = "/login";
 }
 
-export async function login(username: string, password: string) {
-  const { data } = await api.post("/auth/login", { username, password });
-  setToken(data.access_token);
+export type LoginResult = {
+  access_token?: string | null;
+  token_type?: string;
+  user?: Record<string, unknown> | null;
+  mfa_required?: boolean;
+  mfa_setup_required?: boolean;
+  mfa_token?: string | null;
+  mfa_secret?: string | null;
+  otpauth_uri?: string | null;
+  qr_png_data_url?: string | null;
+  must_change_password?: boolean;
+  token_class?: string | null;
+  changed?: boolean;
+};
+
+export async function login(username: string, password: string): Promise<LoginResult> {
+  const { data } = await api.post<LoginResult>("/auth/login", { username, password });
+  if (data.access_token) {
+    setToken(data.access_token);
+  }
+  return data;
+}
+
+export async function verifyMfa(mfaToken: string, code: string): Promise<LoginResult> {
+  const { data } = await api.post<LoginResult>("/auth/mfa/verify", {
+    mfa_token: mfaToken,
+    code,
+  });
+  if (data.access_token) {
+    setToken(data.access_token);
+  }
+  return data;
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<LoginResult> {
+  const { data } = await api.post<LoginResult>("/auth/change-password", {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
+  if (data.access_token) {
+    setToken(data.access_token);
+  } else if (data.mfa_setup_required || data.mfa_required) {
+    // Password changed; awaiting MFA — drop bootstrap token until MFA completes.
+    clearToken();
+  }
   return data;
 }
 

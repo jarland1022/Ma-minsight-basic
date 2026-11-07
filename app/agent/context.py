@@ -23,9 +23,6 @@ class AlertBrief(BaseModel):
     alert_category: str | None = None
     triage_rule_score: float | None = None
     triage_route: str | None = None
-    dst_ip: str | None = None
-    process_name: str | None = None
-    file_hash: str | None = None
 
 
 class EventBrief(BaseModel):
@@ -50,23 +47,11 @@ class SopBrief(BaseModel):
     termination_policy: dict[str, Any] | None = None
 
 
-class PlaybookBrief(BaseModel):
-    id: str
-    name: str
-    summary: str = ""
-    domain: str | None = None
-    mitre_attack: list[str] = Field(default_factory=list)
-    investigation_steps: list[str] = Field(default_factory=list)
-    runtime_skills: list[str] = Field(default_factory=list)
-    human_questions: list[str] = Field(default_factory=list)
-
-
 class InvestigationContext(BaseModel):
     investigation_id: UUID
     event: EventBrief
     alerts: list[AlertBrief] = Field(default_factory=list)
     sop: SopBrief | None = None
-    playbooks: list[PlaybookBrief] = Field(default_factory=list)
     reference_cases: list[dict[str, Any]] = Field(default_factory=list)
     human_review_context: dict[str, Any] | None = None
     model_name: str = "deepseek-chat"
