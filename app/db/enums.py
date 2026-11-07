@@ -92,6 +92,17 @@ class InvestigationStatus(str, enum.Enum):
     DEGRADED = "degraded"
 
 
+class InvestigationFailureClass(str, enum.Enum):
+    """Structured ops vs security-gap classification (P0-03 / P0-05)."""
+
+    LLM_SERVICE = "llm_service"
+    REQUIRED_SKILL = "required_skill"
+    OPTIONAL_SKILL = "optional_skill"
+    DATASOURCE = "datasource"
+    SECURITY_EVIDENCE_INSUFFICIENT = "security_evidence_insufficient"
+    BUSINESS_CONTEXT_INSUFFICIENT = "business_context_insufficient"
+
+
 class InvestigationVerdict(str, enum.Enum):
     ATTACK_CONFIRMED = "attack_confirmed"
     LIKELY_FALSE_POSITIVE = "likely_false_positive"
@@ -165,6 +176,19 @@ class ActorType(str, enum.Enum):
     USER = "user"
     SYSTEM = "system"
     AGENT = "agent"
+
+
+class UserRole(str, enum.Enum):
+    """Console account roles.
+
+    - admin: full control
+    - operator: day-to-day triage / response (can mutate)
+    - pilot_readonly: time-boxed viewer for customer pilots (no response actions)
+    """
+
+    ADMIN = "admin"
+    OPERATOR = "operator"
+    PILOT_READONLY = "pilot_readonly"
 
 
 class HealthCheckStage(str, enum.Enum):

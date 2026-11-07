@@ -9,6 +9,7 @@ export type ConfigRow = {
 export type EventRow = {
   id: string;
   title?: string | null;
+  /** Event workflow / queue status — not a security verdict */
   status: string;
   risk_score: number;
   queue_priority: number;
@@ -22,6 +23,13 @@ export type EventRow = {
   human_review_is_system_error?: boolean;
   aggregate_host_name?: string | null;
   aggregate_user_name?: string | null;
+  /** Latest investigation workflow status (independent of event status) */
+  investigation_status?: string | null;
+  /** Live security verdict; null for ops FAILED */
+  security_verdict?: string | null;
+  failure_class?: string | null;
+  risk_level?: string | null;
+  evidence_strength?: string | null;
 };
 
 export type AlertDetailRow = {
@@ -59,13 +67,20 @@ export type HumanReviewRow = {
 export type InvestigationRow = {
   id: string;
   status: string;
+  failure_class?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
   started_at?: string | null;
   finished_at?: string | null;
   closure_retry_count?: number | null;
   hypothesis_template?: HypothesisTemplate | null;
   conclusion?: {
-    verdict: string;
+    /** Live security verdict; null when ops-failed / invalidated */
+    verdict: string | null;
+    stored_verdict?: string | null;
+    invalidated_as_ops_failure?: boolean;
     confidence: number;
+    risk_level?: string | null;
     reasoning?: string | null;
     human_query?: string | null;
     recommended_action?: string | null;
@@ -148,6 +163,7 @@ export type EventDetail = {
   title?: string | null;
   status: string;
   risk_score: number;
+  queue_priority?: number;
   aggregate_host_name?: string | null;
   aggregate_user_name?: string | null;
   primary_category?: string | null;

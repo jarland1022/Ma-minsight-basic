@@ -1,13 +1,13 @@
-"""Optional embedding generation for judgment cases."""
+"""Optional embedding generation for judgment cases (via EgressGateway)."""
 
 from __future__ import annotations
 
 import logging
 from typing import Any
 
-import httpx
-
 from app.core.config import settings
+from app.privacy.egress_gateway import EgressDeniedError, get_egress_gateway
+from app.privacy.types import ContentType, EgressChannel, EgressContext
 
 logger = logging.getLogger(__name__)
 
@@ -29,13 +29,25 @@ class EmbeddingService:
         headers = {"Authorization": f"Bearer {api_key}"}
         body: dict[str, Any] = {"model": self.model, "input": text[:8000]}
 
+        gateway = get_egress_gateway()
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(url, json=body, headers=headers)
-                response.raise_for_status()
-                data = response.json()
+            response = await gateway.send(
+                channel=EgressChannel.EMBED,
+                method="POST",
+                url=url,
+                headers=headers,
+                json_body=body,
+                content_type=ContentType.JSON,
+                context=EgressContext(),
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
             vector = data["data"][0]["embedding"]
             return [float(x) for x in vector]
+        except EgressDeniedError as exc:
+            logger.warning("Embedding egress denied: %s", exc.reason)
+            return None
         except Exception:
             logger.exception("Embedding API call failed")
             return None

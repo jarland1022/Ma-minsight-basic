@@ -30,7 +30,7 @@ npm run build  # dist → nginx root
 
 ## 登录
 
-- 默认：`admin` / `changeme`（`ADMIN_INITIAL_PASSWORD`）
+- 管理员密码由 `ADMIN_INITIAL_PASSWORD` 注入（禁止在 UI/文档中写死默认口令；生产启动会校验弱密钥）
 - 或使用 `X-API-Key` 调用原有 API
 
 ## 部署

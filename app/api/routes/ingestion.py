@@ -4,16 +4,18 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_auth
+from app.api.deps import assert_pipeline_permission, require_auth, require_write
 from app.core.config import settings
 from app.db.session import get_async_session
 from app.ingestion.services.ingest_service import IngestService
 from app.models.ingestion import DataSource
+from app.services.auth import AuthContext
+from app.services.pipeline_audit import begin_pipeline_audit, finalize_pipeline_audit
 
 router = APIRouter(prefix="/api/v1/ingestion", tags=["ingestion"])
 
@@ -63,23 +65,48 @@ async def list_sources(session: AsyncSession = Depends(get_async_session)) -> li
 @router.post(
     "/sources/{source_id}/pull",
     response_model=PullResponse,
-    dependencies=[Depends(require_auth)],
 )
 async def manual_pull(
     source_id: UUID,
+    request: Request,
     max_batches: int = Query(default=10, ge=1, le=100),
+    auth: AuthContext = Depends(require_write),
     session: AsyncSession = Depends(get_async_session),
 ) -> PullResponse:
-    service = IngestService(session)
+    assert_pipeline_permission(auth, "ingestion")
+    started = await begin_pipeline_audit(
+        session,
+        request,
+        auth,
+        pipeline="ingestion",
+        detail={
+            "source_id": str(source_id),
+            "max_batches": max_batches,
+            "source": "ingestion/pull",
+        },
+    )
     try:
-        run_result = await service.run_for_source(
+        run_result = await IngestService(session).run_for_source(
             source_id,
             max_batches=max_batches or settings.ingestion_max_batches_per_run,
             use_lock=True,
         )
     except ValueError as exc:
+        await finalize_pipeline_audit(started.id, success=False, error=str(exc))
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception as exc:
+        await finalize_pipeline_audit(started.id, success=False, error=str(exc))
+        raise
 
+    await finalize_pipeline_audit(
+        started.id,
+        success=True,
+        result_detail={
+            "inserted": run_result.total_inserted,
+            "duplicates": run_result.total_duplicates,
+            "skipped_lock": run_result.skipped_lock,
+        },
+    )
     return PullResponse(
         data_source_id=str(run_result.data_source_id),
         inserted=run_result.total_inserted,

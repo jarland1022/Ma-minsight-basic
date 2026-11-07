@@ -1,11 +1,11 @@
 [project]
 name = "ma-minsight"
 version = "0.1.0"
-description = "MA-MinSight Community — SIEM alert triage (EN default docs/UI; ZH switchable)"
+description = "AI Agent based security alert triage and investigation system"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "sqlalchemy[asyncio]>=2.0.36",
+    "sqlalchemy[asyncio]>=2.0.36,<2.1",
     "asyncpg>=0.30.0",
     "alembic>=1.14.0",
     "psycopg2-binary>=2.9.10",
@@ -20,7 +20,8 @@ dependencies = [
     "pyjwt>=2.8.0",
     "bcrypt>=4.2.0",
     "geoip2>=4.8.0",
-    "cryptography>=43.0.0",
+    "pyotp>=2.9.0",
+    "qrcode[pil]>=8.0",
 ]
 
 [project.scripts]
@@ -42,9 +43,6 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*"]
-
-[tool.setuptools.package-data]
-app = ["playbooks/*.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

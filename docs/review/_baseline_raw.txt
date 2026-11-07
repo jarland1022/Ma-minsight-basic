@@ -1,0 +1,55 @@
+﻿FFFFFFFF                                                                 [100%]
+================================== FAILURES ===================================
+E   assert datetime.datetime(2026, 6, 23, 0, 0) == datetime.datetime(2026, 6, 23, 0, 0, tzinfo=datetime.timezone.utc)
+     +  where datetime.datetime(2026, 6, 23, 0, 0, tzinfo=datetime.timezone.utc) = datetime(2026, 6, 23, 0, 0, tzinfo=datetime.timezone.utc)
+d:\AI\AI-SEC\tests\aggregation\test_event_key.py:14: assert datetime.datetime(2026, 6, 23, 0, 0) == datetime.datetime(2026, 6, 23, 0, 0, tzinfo=datetime.timezone.utc)
+E   AssertionError: assert 'postgresql+p...2/ma_minsight' == 'postgresql:/...2/ma_minsight'
+      
+      - postgresql://ma_minsight:p%40ss%3Aword%2F%242@postgres:5432/ma_minsight
+      + postgresql+psycopg2://ma_minsight:p%40ss%3Aword%2F%242@postgres:5432/ma_minsight
+      ?           +++++++++
+D:\AI\AI-SEC\tests\core\test_config.py:15: AssertionError: assert 'postgresql+p...2/ma_minsight' == 'postgresql:/...2/ma_minsight'
+E   assert datetime.datetime(2026, 11, 6, 2, 2, 15, 556192) <= datetime.datetime(2026, 11, 6, 2, 2, 15, 556184)
+     +  where datetime.datetime(2026, 11, 6, 2, 2, 15, 556184) = <built-in method replace of datetime.datetime object at 0x0000022227F7CF00>(tzinfo=None)
+     +    where <built-in method replace of datetime.datetime object at 0x0000022227F7CF00> = datetime.datetime(2026, 11, 6, 2, 2, 15, 556184, tzinfo=datetime.timezone.utc).replace
+D:\AI\AI-SEC\tests\skills\test_query_threat_intel_timezone.py:16: assert datetime.datetime(2026, 11, 6, 2, 2, 15, 556192) <= datetime.datetime(2026, 11, 6, 2, 2, 15, 556184)
+E   AssertionError: assert {'alert_dedup...entries', ...} == {'alert_dedup...entries', ...}
+      
+      Extra items in the left set:
+      'tool_gateway_credentials'
+      'investigation_audits'
+      'entity_relations'
+      'disposition_simulations'
+      Use -v to get more diff
+d:\AI\AI-SEC\tests\test_models.py:44: AssertionError: assert {'alert_dedup...entries', ...} == {'alert_dedup...entries', ...}
+E   AssertionError: assert False is True
+     +  where False = is_public_ip('203.0.113.1')
+d:\AI\AI-SEC\tests\threat_intel\test_ip_utils.py:12: AssertionError: assert False is True
+E   TypeError: can't compare offset-naive and offset-aware datetimes
+D:\AI\AI-SEC\app\triage\handlers\dedup.py:51: TypeError: can't compare offset-naive and offset-aware datetimes
+E   TypeError: can't compare offset-naive and offset-aware datetimes
+D:\AI\AI-SEC\app\triage\handlers\dedup.py:51: TypeError: can't compare offset-naive and offset-aware datetimes
+E   pydantic_core._pydantic_core.ValidationError: 4 validation errors for AlertSnapshot
+    id
+      Field required [type=missing, input_value={'alert_id': UUID('3f79e0...3.1', 'rule_id': '5710'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.13/v/missing
+    data_source_id
+      Field required [type=missing, input_value={'alert_id': UUID('3f79e0...3.1', 'rule_id': '5710'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.13/v/missing
+    source_alert_id
+      Field required [type=missing, input_value={'alert_id': UUID('3f79e0...3.1', 'rule_id': '5710'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.13/v/missing
+    fingerprint
+      Field required [type=missing, input_value={'alert_id': UUID('3f79e0...3.1', 'rule_id': '5710'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.13/v/missing
+d:\AI\AI-SEC\tests\triage\test_frequency_datetime.py:18: pydantic_core._pydantic_core.ValidationError: 4 validation errors for AlertSnapshot
+=========================== short test summary info ===========================
+FAILED tests/aggregation/test_event_key.py::test_floor_to_window_start_utc_midnight
+FAILED tests/core/test_config.py::test_assemble_database_urls_encodes_special_characters
+FAILED tests/skills/test_query_threat_intel_timezone.py::test_utc_now_matches_postgres_timestamp_expectation
+FAILED tests/test_models.py::test_all_tables_registered - AssertionError: ass...
+FAILED tests/threat_intel/test_ip_utils.py::test_is_public_ip - AssertionErro...
+FAILED tests/triage/test_dedup.py::test_dedup_hit_when_representative_exists
+FAILED tests/triage/test_dedup.py::test_dedup_resets_expired_window - TypeErr...
+FAILED tests/triage/test_frequency_datetime.py::test_frequency_db_fallback_uses_naive_datetime
+8 failed in 2.78s

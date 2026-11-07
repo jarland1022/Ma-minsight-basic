@@ -13,6 +13,8 @@ import SettingsPage from "./pages/SettingsPage";
 import UserGuidePage from "./pages/UserGuidePage";
 import PlaybooksPage from "./pages/PlaybooksPage";
 import LicensePage from "./pages/LicensePage";
+import MorningNotePage from "./pages/MorningNotePage";
+import PilotAccountsPage from "./pages/PilotAccountsPage";
 
 function PrivateRoute({ children }: { children: JSX.Element }) {
   if (!getToken()) {
@@ -35,16 +37,18 @@ export default function App() {
           }
         >
           <Route index element={<DashboardPage />} />
+          <Route path="morning-note" element={<MorningNotePage />} />
           <Route path="events" element={<EventsPage />} />
           <Route path="events/:id" element={<EventDetailPage />} />
           <Route path="investigations/:id/trace" element={<TracePage />} />
           <Route path="human-review" element={<HumanReviewPage />} />
+          <Route path="playbooks" element={<PlaybooksPage />} />
           <Route path="guide" element={<UserGuidePage />} />
           <Route path="defense-assets" element={<DefenseAssetsPage />} />
-          <Route path="playbooks" element={<PlaybooksPage />} />
           <Route path="eval" element={<EvalPage />} />
           <Route path="license" element={<LicensePage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="pilot-accounts" element={<PilotAccountsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

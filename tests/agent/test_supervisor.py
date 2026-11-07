@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from unittest.mock import MagicMock
 
 from app.agent.conclusion import ConclusionPayload
@@ -49,43 +50,3 @@ def test_supervisor_flags_path_drift() -> None:
     )
     assert result.passed is False
     assert any("path_drift" in i for i in result.findings.get("issues", []))
-
-
-def test_supervisor_allows_core_timeline_skill() -> None:
-    result = InvestigationSupervisor.audit(
-        _conclusion(),
-        [
-            _tool_call("query_asset"),
-            _tool_call("query_behavior_timeline"),
-            _tool_call("query_threat_intel"),
-        ],
-        config=SupervisorConfig(max_off_sop_skill_calls=0),
-        recommended_skills=["query_asset"],
-    )
-    assert result.passed is True
-
-
-def test_supervisor_flags_attack_without_multi_path() -> None:
-    # Bypass schema guard to assert post-submit supervisor still catches this.
-    conclusion = ConclusionPayload.model_construct(
-        verdict=InvestigationVerdict.ATTACK_CONFIRMED,
-        confidence=0.9,
-        risk_level=RiskLevel.HIGH,
-        reasoning="bad ip 9.9.9.9",
-        evidence_refs=[],
-        evidence_strength="single_path",
-        disposition_grade=None,
-        human_query=None,
-        missing_info=[],
-        suggested_assets=None,
-        hypotheses_evaluated=[],
-        refutation_summary=None,
-        recommended_action=None,
-    )
-    result = InvestigationSupervisor.audit(
-        conclusion,
-        [_tool_call("query_threat_intel", "intel for 9.9.9.9")],
-        config=SupervisorConfig(),
-        recommended_skills=["query_threat_intel"],
-    )
-    assert any("multi_path" in i for i in result.findings.get("issues", []))

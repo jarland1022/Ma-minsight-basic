@@ -12,27 +12,11 @@ def test_parse_valid_conclusion() -> None:
             "verdict": "attack_confirmed",
             "confidence": 0.9,
             "risk_level": "high",
-            "reasoning": "Timeline + threat intel both point to C2.",
-            "evidence_refs": ["timeline:host:pc-1", "intel:ip:1.2.3.4"],
-            "evidence_strength": "multi_path",
+            "reasoning": "Multiple failed logins with no asset whitelist.",
+            "evidence_refs": ["history:ip:1.2.3.4"],
         }
     )
     assert payload.verdict == InvestigationVerdict.ATTACK_CONFIRMED
-    assert payload.evidence_strength == "multi_path"
-    assert payload.disposition_grade == "confirmed_compromise"
-
-
-def test_attack_confirmed_requires_multi_path() -> None:
-    with pytest.raises(Exception):
-        parse_conclusion(
-            {
-                "verdict": "attack_confirmed",
-                "confidence": 0.9,
-                "risk_level": "high",
-                "reasoning": "Only one intel hit",
-                "evidence_strength": "single_path",
-            }
-        )
 
 
 def test_insufficient_requires_human_query() -> None:

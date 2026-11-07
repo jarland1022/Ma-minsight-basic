@@ -4,7 +4,6 @@ __pycache__/
 .venv/
 venv/
 .env
-.mmdb
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -20,14 +19,5 @@ ma-minsight-base.tar
 # TLS private keys (ECS-A)
 deploy/nginx/certs/
 
-# License (Pro)
-configs/license/*-private.pem
-configs/license/license.lic
-configs/license/.grace_*
-.grace_*
-
-# Overseas landing local build
-docs/marketing/overseas/landing.env
-site/index.html
-site/CNAME
-site-preview.html
+# Local license material (never commit)
+configs/license/

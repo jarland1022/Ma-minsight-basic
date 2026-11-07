@@ -46,6 +46,9 @@ class HumanReviewRequest(Base, CreatedAtMixin):
     external_msg_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(nullable=True)
     answered_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    cancel_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    cancelled_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     investigation: Mapped[Investigation] = relationship(back_populates="human_review_requests")
     event: Mapped[Event] = relationship(back_populates="human_review_requests")

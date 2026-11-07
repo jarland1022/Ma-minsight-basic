@@ -27,21 +27,6 @@ class SupervisorResult:
         return {"passed": self.passed, **self.findings}
 
 
-# Core investigation skills are never counted as path-drift.
-_CORE_INVESTIGATION_SKILLS = frozenset(
-    {
-        "query_behavior_timeline",
-        "query_sample_enrichment",
-        "query_entity_graph",
-        "query_asset",
-        "query_history_alerts",
-        "query_threat_intel",
-        "simulate_disposition",
-        "submit_conclusion",
-    }
-)
-
-
 class InvestigationSupervisor:
     @staticmethod
     def audit(
@@ -67,11 +52,9 @@ class InvestigationSupervisor:
                 issues.append(f"missing_recommended_skills:{','.join(missing)}")
                 findings["missing_recommended_skills"] = missing
 
-        sop_skills = set(recommended_skills or []) | _CORE_INVESTIGATION_SKILLS
+        sop_skills = set(recommended_skills or []) | {"submit_conclusion"}
         off_sop_calls = [
-            tc.skill_name
-            for tc in tool_calls
-            if tc.skill_name and tc.skill_name not in sop_skills
+            tc.skill_name for tc in tool_calls if tc.skill_name and tc.skill_name not in sop_skills
         ]
         if len(off_sop_calls) > config.max_off_sop_skill_calls:
             issues.append("path_drift:too_many_off_sop_skills")
@@ -95,19 +78,11 @@ class InvestigationSupervisor:
             issues.append("possible_hallucinated_ip")
             findings["hallucinated_ips"] = sorted(hallucinated_ips)[:5]
 
-        if (
-            conclusion.verdict.value == "attack_confirmed"
-            and conclusion.evidence_strength != "multi_path"
-        ):
-            issues.append("attack_confirmed_without_multi_path")
-            findings["evidence_strength"] = conclusion.evidence_strength
-
         findings["issues"] = issues
         findings["successful_skills"] = sorted(successful_skills)
         passed = len(issues) == 0 or not any(
             i.startswith("ungrounded_")
             or i == "possible_hallucinated_ip"
-            or i == "attack_confirmed_without_multi_path"
             or i.startswith("missing_recommended_skills:")
             or i.startswith("path_drift:")
             for i in issues

@@ -22,12 +22,7 @@ def _conclusion(**overrides: object) -> ConclusionPayload:
 def test_closure_passes_with_required_skills() -> None:
     result = ClosureEvaluator.evaluate(
         _conclusion(),
-        skills_called={
-            "query_behavior_timeline",
-            "query_asset",
-            "query_threat_intel",
-            "query_entity_graph",
-        },
+        skills_called={"query_asset", "query_threat_intel", "query_entity_graph"},
         hypothesis_template=BRUTE_FORCE_HYPOTHESIS_TEMPLATE,
         config=ClosureConfig(),
     )
@@ -37,12 +32,8 @@ def test_closure_passes_with_required_skills() -> None:
 
 def test_closure_rejects_attack_without_refutation() -> None:
     result = ClosureEvaluator.evaluate(
-        _conclusion(
-            verdict=InvestigationVerdict.ATTACK_CONFIRMED,
-            risk_level=RiskLevel.HIGH,
-            evidence_strength="multi_path",
-        ),
-        skills_called={"query_behavior_timeline", "query_threat_intel", "query_history_alerts"},
+        _conclusion(verdict=InvestigationVerdict.ATTACK_CONFIRMED, risk_level=RiskLevel.HIGH),
+        skills_called={"query_threat_intel", "query_history_alerts"},
         hypothesis_template=BRUTE_FORCE_HYPOTHESIS_TEMPLATE,
         config=ClosureConfig(require_refutation_attempt=True),
     )

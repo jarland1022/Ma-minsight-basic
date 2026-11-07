@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_auth
+from app.api.deps import assert_pipeline_permission, require_auth, require_write
 from app.db.session import get_async_session
+from app.services.auth import AuthContext
+from app.services.pipeline_audit import begin_pipeline_audit, finalize_pipeline_audit
 from app.triage.services.triage_service import TriageService
 
 router = APIRouter(prefix="/api/v1/triage", tags=["triage"])
@@ -32,13 +34,31 @@ class AlertTriageDetail(BaseModel):
     triage: dict | None
 
 
-@router.post("/run", response_model=TriageRunResponse, dependencies=[Depends(require_auth)])
+@router.post("/run", response_model=TriageRunResponse)
 async def run_triage(
+    request: Request,
     limit: int = Query(default=500, ge=1, le=2000),
+    auth: AuthContext = Depends(require_write),
     session: AsyncSession = Depends(get_async_session),
 ) -> TriageRunResponse:
-    service = TriageService(session)
-    result = await service.run(limit=limit, use_lock=True)
+    assert_pipeline_permission(auth, "triage")
+    started = await begin_pipeline_audit(
+        session, request, auth, pipeline="triage", detail={"limit": limit, "source": "triage/run"}
+    )
+    try:
+        result = await TriageService(session).run(limit=limit, use_lock=True)
+    except Exception as exc:
+        await finalize_pipeline_audit(started.id, success=False, error=str(exc))
+        raise
+    await finalize_pipeline_audit(
+        started.id,
+        success=True,
+        result_detail={
+            "processed": result.processed,
+            "skipped_lock": result.skipped_lock,
+            "errors": result.errors[:20],
+        },
+    )
     return TriageRunResponse(
         processed=result.processed,
         skipped_lock=result.skipped_lock,

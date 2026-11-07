@@ -306,6 +306,11 @@ class HumanReviewService:
         investigation = result.scalar_one_or_none()
         if investigation is None or investigation.conclusion is None:
             return None
+        # Ops failures / invalidated conclusions must never enter security Human Review.
+        if investigation.status == InvestigationStatus.FAILED:
+            return None
+        if investigation.conclusion.invalidated_as_ops_failure:
+            return None
         if investigation.conclusion.verdict not in HUMAN_VERDICTS:
             return None
         return investigation, investigation.conclusion

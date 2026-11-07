@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import UserGuidePanel from "../components/UserGuidePanel";
 import { PAGE_GUIDES } from "../content/userGuide";
+import { useMe } from "../hooks/useMe";
 import { useI18n } from "../i18n/I18nProvider";
 
 type HumanReviewRequestRow = {
@@ -16,6 +17,8 @@ type HumanReviewRequestRow = {
 
 export default function HumanReviewPage() {
   const { t } = useI18n();
+  const { data: me } = useMe();
+  const isReadonly = Boolean(me?.is_readonly);
   const qc = useQueryClient();
   const [replies, setReplies] = useState<Record<string, string>>({});
 
@@ -119,25 +122,31 @@ export default function HumanReviewPage() {
                     : ""}
                 </Typography.Text>
 
-                <Input.TextArea
-                  rows={5}
-                  placeholder={t("humanReviewPage.placeholder")}
-                  value={replyText}
-                  onChange={(e) =>
-                    setReplies((prev) => ({ ...prev, [item.id]: e.target.value }))
-                  }
-                />
+                {isReadonly ? (
+                  <Alert type="warning" showIcon message={t("pilots.writeDisabled")} />
+                ) : (
+                  <>
+                    <Input.TextArea
+                      rows={5}
+                      placeholder={t("humanReviewPage.placeholder")}
+                      value={replyText}
+                      onChange={(e) =>
+                        setReplies((prev) => ({ ...prev, [item.id]: e.target.value }))
+                      }
+                    />
 
-                <Button
-                  type="primary"
-                  disabled={!replyText.trim()}
-                  loading={reply.isPending && reply.variables?.request_id === item.id}
-                  onClick={() =>
-                    reply.mutate({ request_id: item.id, raw_content: replyText.trim() })
-                  }
-                >
-                  {t("humanReviewPage.submit")}
-                </Button>
+                    <Button
+                      type="primary"
+                      disabled={!replyText.trim()}
+                      loading={reply.isPending && reply.variables?.request_id === item.id}
+                      onClick={() =>
+                        reply.mutate({ request_id: item.id, raw_content: replyText.trim() })
+                      }
+                    >
+                      {t("humanReviewPage.submit")}
+                    </Button>
+                  </>
+                )}
               </Space>
             </Card>
           );

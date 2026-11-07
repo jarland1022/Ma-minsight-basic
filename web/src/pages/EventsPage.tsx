@@ -5,7 +5,11 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import UserGuidePanel from "../components/UserGuidePanel";
-import { eventStatusLabel } from "../components/VerdictLabels";
+import {
+  InvestigationStatusTag,
+  VerdictTag,
+  eventStatusLabel,
+} from "../components/VerdictLabels";
 import { EVENT_STATUS_GUIDE, PAGE_GUIDES } from "../content/userGuide";
 import type { EventRow, Paginated } from "../types/api";
 import { useI18n } from "../i18n/I18nProvider";
@@ -106,6 +110,17 @@ function EventsTable({ status }: { status: string }) {
           )}
         </Space>
       ),
+    },
+    {
+      title: t("events.colInvestigationStatus"),
+      dataIndex: "investigation_status",
+      render: (v: string | null | undefined) => <InvestigationStatusTag status={v} />,
+    },
+    {
+      title: t("events.colVerdict"),
+      dataIndex: "security_verdict",
+      render: (v: string | null | undefined) =>
+        v ? <VerdictTag verdict={v} /> : <Typography.Text type="secondary">—</Typography.Text>,
     },
     {
       title: t("events.colRisk"),

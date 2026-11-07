@@ -6,23 +6,23 @@ import json
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_admin, require_auth, require_pro_license
+from app.api.audit_helpers import security_audit
+from app.api.deps import require_admin, require_auth
 from app.db.enums import InvestigationVerdict
 from app.db.session import get_async_session
 from app.eval.regression.runner import RegressionRunner
 from app.models.cache_eval import RegressionTestCase, RegressionTestRun
+from app.services.audit import AuditResult
+from app.services.auth import AuthContext
+from app.services.pipeline_audit import begin_pipeline_audit, finalize_pipeline_audit
 
-router = APIRouter(
-    prefix="/api/v1/regression",
-    tags=["regression"],
-    dependencies=[Depends(require_pro_license)],
-)
+router = APIRouter(prefix="/api/v1/regression", tags=["regression"])
 
 
 class CaseCreateRequest(BaseModel):
@@ -84,9 +84,11 @@ async def list_cases(
     }
 
 
-@router.post("/cases", dependencies=[Depends(require_admin)], status_code=status.HTTP_201_CREATED)
+@router.post("/cases", status_code=status.HTTP_201_CREATED)
 async def create_case(
     body: CaseCreateRequest,
+    request: Request,
+    auth: AuthContext = Depends(require_admin),
     session: AsyncSession = Depends(get_async_session),
 ) -> dict:
     row = RegressionTestCase(
@@ -99,20 +101,40 @@ async def create_case(
         is_active=body.is_active,
     )
     session.add(row)
+    await session.flush()
+    await security_audit(
+        session,
+        request,
+        auth,
+        action="regression.case.create",
+        resource_type="regression_case",
+        resource_id=row.id,
+        after={"name": row.name, "expected_verdict": row.expected_verdict.value, "tags": row.tags},
+        result=AuditResult.SUCCESS,
+        commit=False,
+    )
     await session.commit()
     await session.refresh(row)
     return {"id": str(row.id), "name": row.name}
 
 
-@router.put("/cases/{case_id}", dependencies=[Depends(require_admin)])
+@router.put("/cases/{case_id}")
 async def update_case(
     case_id: UUID,
     body: CaseCreateRequest,
+    request: Request,
+    auth: AuthContext = Depends(require_admin),
     session: AsyncSession = Depends(get_async_session),
 ) -> dict:
     row = await session.get(RegressionTestCase, case_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Case not found")
+    before = {
+        "name": row.name,
+        "expected_verdict": row.expected_verdict.value,
+        "is_active": row.is_active,
+        "tags": row.tags,
+    }
     row.name = body.name
     row.alert_payload = body.alert_payload
     row.expected_verdict = body.expected_verdict
@@ -120,13 +142,32 @@ async def update_case(
     row.forbidden_skills = body.forbidden_skills
     row.tags = body.tags
     row.is_active = body.is_active
+    await security_audit(
+        session,
+        request,
+        auth,
+        action="regression.case.update",
+        resource_type="regression_case",
+        resource_id=case_id,
+        before=before,
+        after={
+            "name": row.name,
+            "expected_verdict": row.expected_verdict.value,
+            "is_active": row.is_active,
+            "tags": row.tags,
+        },
+        result=AuditResult.SUCCESS,
+        commit=False,
+    )
     await session.commit()
     return {"id": str(row.id), "name": row.name}
 
 
-@router.post("/cases/import", dependencies=[Depends(require_admin)])
+@router.post("/cases/import")
 async def import_cases(
+    request: Request,
     file: UploadFile = File(...),
+    auth: AuthContext = Depends(require_admin),
     session: AsyncSession = Depends(get_async_session),
 ) -> dict:
     raw = await file.read()
@@ -148,13 +189,40 @@ async def import_cases(
             )
         )
         imported += 1
+    await security_audit(
+        session,
+        request,
+        auth,
+        action="regression.case.import",
+        resource_type="regression_case",
+        resource_id="bulk",
+        detail={"imported": imported, "filename": file.filename},
+        result=AuditResult.SUCCESS,
+        commit=False,
+    )
     await session.commit()
     return {"imported": imported}
 
 
-@router.get("/cases/export.jsonl", dependencies=[Depends(require_auth)])
-async def export_cases(session: AsyncSession = Depends(get_async_session)) -> PlainTextResponse:
+@router.get("/cases/export.jsonl")
+async def export_cases(
+    request: Request,
+    auth: AuthContext = Depends(require_auth),
+    session: AsyncSession = Depends(get_async_session),
+) -> PlainTextResponse:
     rows = (await session.execute(select(RegressionTestCase).order_by(RegressionTestCase.name))).scalars().all()
+    await security_audit(
+        session,
+        request,
+        auth,
+        action="data.export",
+        resource_type="regression_case",
+        resource_id="export.jsonl",
+        detail={"count": len(rows)},
+        result=AuditResult.SUCCESS,
+        commit=False,
+    )
+    await session.commit()
     lines = []
     for row in rows:
         lines.append(
@@ -174,17 +242,40 @@ async def export_cases(session: AsyncSession = Depends(get_async_session)) -> Pl
     return PlainTextResponse("\n".join(lines) + ("\n" if lines else ""), media_type="application/x-ndjson")
 
 
-@router.post("/run", response_model=RunResponse, dependencies=[Depends(require_admin)])
+@router.post("/run", response_model=RunResponse)
 async def run_regression(
+    request: Request,
     tag: str | None = None,
     use_real_llm: bool = Query(default=False),
+    auth: AuthContext = Depends(require_admin),
     session: AsyncSession = Depends(get_async_session),
 ) -> RunResponse:
-    result = await RegressionRunner(session).run(
-        trigger="api",
-        tag=tag,
-        use_real_llm=use_real_llm,
-        use_lock=True,
+    started = await begin_pipeline_audit(
+        session,
+        request,
+        auth,
+        pipeline="regression",
+        detail={"tag": tag, "use_real_llm": use_real_llm, "source": "regression/run"},
+    )
+    try:
+        result = await RegressionRunner(session).run(
+            trigger="api",
+            tag=tag,
+            use_real_llm=use_real_llm,
+            use_lock=True,
+        )
+    except Exception as exc:
+        await finalize_pipeline_audit(started.id, success=False, error=str(exc))
+        raise
+    await finalize_pipeline_audit(
+        started.id,
+        success=True,
+        result_detail={
+            "total": result.total,
+            "passed": result.passed,
+            "failed": result.failed,
+            "skipped_lock": result.skipped_lock,
+        },
     )
     return RunResponse(
         run_id=str(result.run_id) if result.run_id else None,

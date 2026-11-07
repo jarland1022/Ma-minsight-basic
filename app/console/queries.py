@@ -305,6 +305,42 @@ async def _active_human_review_by_event_ids(
     return out
 
 
+async def _latest_investigation_summary_by_event_ids(
+    session: AsyncSession,
+    event_ids: list[UUID],
+) -> dict[UUID, dict]:
+    """Latest investigation per event with independent P0-04 dimensions."""
+    from app.agent.semantics import active_security_verdict
+
+    if not event_ids:
+        return {}
+    result = await session.execute(
+        select(Investigation)
+        .options(selectinload(Investigation.conclusion))
+        .where(Investigation.event_id.in_(event_ids))
+        .order_by(Investigation.started_at.desc())
+    )
+    out: dict[UUID, dict] = {}
+    for inv in result.scalars().all():
+        if inv.event_id in out:
+            continue
+        conc = inv.conclusion
+        invalidated = bool(conc.invalidated_as_ops_failure) if conc is not None else False
+        stored = conc.verdict.value if conc is not None and conc.verdict else None
+        out[inv.event_id] = {
+            "investigation_status": inv.status.value,
+            "failure_class": inv.failure_class,
+            "security_verdict": active_security_verdict(
+                investigation_status=inv.status.value,
+                verdict=stored,
+                invalidated_as_ops_failure=invalidated,
+            ),
+            "risk_level": conc.risk_level.value if conc is not None and conc.risk_level else None,
+            "evidence_strength": conc.evidence_strength if conc is not None else None,
+        }
+    return out
+
+
 async def list_events(
     session: AsyncSession,
     *,
@@ -401,6 +437,7 @@ async def list_events(
     rows = result.all()
     event_ids = [e.id for e, _, _ in rows]
     hr_details = await _active_human_review_by_event_ids(session, event_ids)
+    inv_summary = await _latest_investigation_summary_by_event_ids(session, event_ids)
 
     items = []
     for e, investigation_finished_at, human_review_sent_at in rows:
@@ -408,10 +445,12 @@ async def list_events(
         question_preview = question.strip()
         if len(question_preview) > 120:
             question_preview = f"{question_preview[:117]}..."
+        inv = inv_summary.get(e.id, {})
         items.append(
             {
                 "id": str(e.id),
                 "title": e.title,
+                # Event workflow status (queue) — not a security verdict
                 "status": e.status.value,
                 "primary_category": e.primary_category,
                 "queue_priority": e.queue_priority,
@@ -428,6 +467,12 @@ async def list_events(
                 "human_review_is_system_error": is_system_error_human_query(question),
                 "aggregate_host_name": e.aggregate_host_name,
                 "aggregate_user_name": e.aggregate_user_name,
+                # Independent investigation dimensions (P0-04)
+                "investigation_status": inv.get("investigation_status"),
+                "security_verdict": inv.get("security_verdict"),
+                "failure_class": inv.get("failure_class"),
+                "risk_level": inv.get("risk_level"),
+                "evidence_strength": inv.get("evidence_strength"),
             }
         )
     return {"items": items, "total": total, "page": page, "page_size": page_size}
@@ -446,38 +491,55 @@ async def get_event_console_detail(session: AsyncSession, event_id: UUID) -> dic
             selectinload(Investigation.conclusion),
             selectinload(Investigation.audits),
             selectinload(Investigation.disposition_simulations),
-            selectinload(Investigation.sop),
         )
         .where(Investigation.event_id == event_id)
         .order_by(Investigation.started_at.desc())
     )
     investigations = []
     inv_ids: list[UUID] = []
+    from app.agent.semantics import active_security_verdict
+
     for inv in inv_result.scalars().all():
         inv_ids.append(inv.id)
+        conc = inv.conclusion
+        conclusion_payload = None
+        if conc is not None:
+            invalidated = bool(conc.invalidated_as_ops_failure)
+            live_verdict = active_security_verdict(
+                investigation_status=inv.status.value,
+                verdict=conc.verdict.value if conc.verdict else None,
+                invalidated_as_ops_failure=invalidated,
+            )
+            conclusion_payload = {
+                # Security verdict (null when ops-failed / invalidated)
+                "verdict": live_verdict,
+                "stored_verdict": conc.verdict.value if conc.verdict else None,
+                "invalidated_as_ops_failure": invalidated,
+                "confidence": conc.confidence,
+                "risk_level": conc.risk_level.value if conc.risk_level else None,
+                "evidence_strength": conc.evidence_strength,
+                "disposition_grade": conc.disposition_grade,
+                "reasoning": conc.reasoning,
+                "human_query": conc.human_query,
+                "recommended_action": conc.recommended_action,
+                "evidence_closure_score": conc.evidence_closure_score,
+                "refutation_coverage": conc.refutation_coverage,
+                "closure_passed": conc.closure_passed,
+                "closure_checks": conc.closure_checks,
+                "hypotheses_evaluated": conc.hypotheses_evaluated,
+                "refutation_summary": conc.refutation_summary,
+            }
         investigations.append(
             {
                 "id": str(inv.id),
                 "status": inv.status.value,
+                "failure_class": inv.failure_class,
+                "error_code": getattr(inv, "error_code", None),
+                "error_message": inv.error_message,
                 "started_at": inv.started_at.isoformat(),
                 "finished_at": inv.finished_at.isoformat() if inv.finished_at else None,
                 "closure_retry_count": inv.closure_retry_count,
-                "hypothesis_template": inv.sop.hypothesis_template if inv.sop else None,
-                "conclusion": None
-                if inv.conclusion is None
-                else {
-                    "verdict": inv.conclusion.verdict.value,
-                    "confidence": inv.conclusion.confidence,
-                    "reasoning": inv.conclusion.reasoning,
-                    "human_query": inv.conclusion.human_query,
-                    "recommended_action": inv.conclusion.recommended_action,
-                    "evidence_closure_score": inv.conclusion.evidence_closure_score,
-                    "refutation_coverage": inv.conclusion.refutation_coverage,
-                    "closure_passed": inv.conclusion.closure_passed,
-                    "closure_checks": inv.conclusion.closure_checks,
-                    "hypotheses_evaluated": inv.conclusion.hypotheses_evaluated,
-                    "refutation_summary": inv.conclusion.refutation_summary,
-                },
+                "conclusion": conclusion_payload,
                 "supervisor_audits": [
                     {
                         "id": str(a.id),
@@ -568,18 +630,11 @@ async def get_event_console_detail(session: AsyncSession, event_id: UUID) -> dic
     return {
         **base,
         "entity_context_snapshot": event.entity_context_snapshot if event else None,
-        "matched_playbooks": _matched_playbooks(event.primary_category if event else None),
         "investigations": investigations,
         "human_reviews": human_reviews,
         "dispositions": dispositions,
         "alert_details": alert_details,
     }
-
-
-def _matched_playbooks(category: str | None) -> list[dict]:
-    from app.playbooks.loader import match_playbooks
-
-    return match_playbooks(category, limit=2)
 
 
 async def get_alert_console_detail(session: AsyncSession, alert_id: UUID) -> dict | None:

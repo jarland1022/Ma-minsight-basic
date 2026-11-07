@@ -1,66 +1,63 @@
-"""License status, fingerprint, and import API."""
+"""License status API for the Professional (AI-SEC) deployment.
+
+This stack ships as Pro by default — import/gating lives in the Community
+edition (Ma-minsight-basic). Endpoints here keep the console License page working.
+"""
 
 from __future__ import annotations
 
-import tempfile
-from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-
+from app.api.audit_helpers import soft_security_audit
 from app.api.deps import require_admin, require_auth
-from app.license import get_manager, read_edition
+from app.db.session import get_async_session
+from app.services.audit import AuditResult
+from app.services.auth import AuthContext
 
 router = APIRouter(prefix="/api/v1/license", tags=["license"])
 
 
 @router.get("/status", dependencies=[Depends(require_auth)])
 async def license_status() -> dict:
-    mgr = get_manager()
     return {
-        "edition": read_edition(),
-        "pro_enabled": mgr.allow_operation(),
-        "license": mgr.status().to_dict(),
+        "edition": "professional",
+        "pro_enabled": True,
+        "license": {
+            "status": "active",
+            "hint": "This deployment is MA-MinSight Professional (AI-SEC). No .lic import is required.",
+            "client_name": "local-pro",
+        },
     }
 
 
 @router.get("/fingerprint", dependencies=[Depends(require_auth)])
 async def license_fingerprint() -> dict:
-    mgr = get_manager()
-    try:
-        return mgr.fingerprint_detail()
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
-        ) from exc
-
-
-@router.post("/import", dependencies=[Depends(require_admin)])
-async def license_import(file: UploadFile = File(...)) -> dict:
-    if not file.filename:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="请上传 .lic 文件（字段名 file）",
-        )
-
-    mgr = get_manager()
-    suffix = Path(file.filename).suffix or ".lic"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(await file.read())
-        tmp_path = Path(tmp.name)
-
-    try:
-        mgr.import_file(tmp_path)
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    finally:
-        tmp_path.unlink(missing_ok=True)
-
     return {
-        "success": True,
-        "message": "License 导入成功",
-        "license": mgr.status().to_dict(),
+        "fingerprint": "professional-build-no-fingerprint",
+        "source": "ai-sec",
+        "hint": "Fingerprint/import applies to Community Edition upgrades only.",
     }
+
+
+@router.post("/import")
+async def license_import(
+    request: Request,
+    auth: AuthContext = Depends(require_admin),
+    session: AsyncSession = Depends(get_async_session),
+) -> dict:
+    await soft_security_audit(
+        session,
+        request,
+        auth,
+        action="license.import",
+        resource_type="license",
+        resource_id="import",
+        detail={"edition": "professional", "accepted": False},
+        result=AuditResult.DENIED,
+        commit=True,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="This Professional deployment does not import Community license.lic files.",
+    )

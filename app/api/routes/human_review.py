@@ -9,17 +9,15 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.human_review.adapters.bootstrap  # noqa: F401
-from app.api.deps import require_auth, require_pro_license
+from app.api.deps import assert_pipeline_permission, require_auth, require_write
 from app.db.session import get_async_session
 from app.human_review.adapters.registry import ImAdapterRegistry
 from app.human_review.adapters.wecom.adapter import WeComAdapter
 from app.human_review.service import HumanReviewService
+from app.services.auth import AuthContext
+from app.services.pipeline_audit import begin_pipeline_audit, finalize_pipeline_audit
 
-router = APIRouter(
-    prefix="/api/v1/human-review",
-    tags=["human-review"],
-    dependencies=[Depends(require_pro_license)],
-)
+router = APIRouter(prefix="/api/v1/human-review", tags=["human-review"])
 
 
 class HumanReviewRunResponse(BaseModel):
@@ -45,13 +43,37 @@ class SubmitResponseResult(BaseModel):
     error: str | None = None
 
 
-@router.post("/run", response_model=HumanReviewRunResponse, dependencies=[Depends(require_auth)])
+@router.post("/run", response_model=HumanReviewRunResponse)
 async def run_human_review(
+    request: Request,
     limit: int = Query(default=10, ge=1, le=50),
+    auth: AuthContext = Depends(require_write),
     session: AsyncSession = Depends(get_async_session),
 ) -> HumanReviewRunResponse:
-    service = HumanReviewService(session)
-    result = await service.run(limit=limit, use_lock=True)
+    assert_pipeline_permission(auth, "human_review")
+    started = await begin_pipeline_audit(
+        session,
+        request,
+        auth,
+        pipeline="human_review",
+        detail={"limit": limit, "source": "human-review/run"},
+    )
+    try:
+        result = await HumanReviewService(session).run(limit=limit, use_lock=True)
+    except Exception as exc:
+        await finalize_pipeline_audit(started.id, success=False, error=str(exc))
+        raise
+    await finalize_pipeline_audit(
+        started.id,
+        success=True,
+        result_detail={
+            "dispatched": result.dispatched,
+            "expired": result.expired,
+            "cancelled_obsolete": result.cancelled_obsolete,
+            "skipped_lock": result.skipped_lock,
+            "errors": result.errors[:20],
+        },
+    )
     return HumanReviewRunResponse(
         dispatched=result.dispatched,
         expired=result.expired,
@@ -80,7 +102,7 @@ async def get_human_review_request(
     return payload
 
 
-@router.post("/requests/{request_id}/cancel", dependencies=[Depends(require_auth)])
+@router.post("/requests/{request_id}/cancel", dependencies=[Depends(require_write)])
 async def cancel_human_review_request(
     request_id: UUID,
     session: AsyncSession = Depends(get_async_session),
@@ -92,7 +114,7 @@ async def cancel_human_review_request(
     return {"cancelled": True}
 
 
-@router.post("/responses", response_model=SubmitResponseResult, dependencies=[Depends(require_auth)])
+@router.post("/responses", response_model=SubmitResponseResult, dependencies=[Depends(require_write)])
 async def submit_human_review_response(
     body: SubmitResponseRequest,
     session: AsyncSession = Depends(get_async_session),
